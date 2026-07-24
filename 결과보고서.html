@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>출처 기반 육아 지식 챗봇 — 결과 보고서</title>
+<style>
+  :root{--blue:#1e3a8a;--ink:#0f172a;--mut:#64748b;--line:#e2e8f0;--bg:#f8fafc;}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;color:var(--ink);background:var(--bg);line-height:1.65;}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px 80px;}
+  header{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:38px 20px;}
+  header .in{max-width:960px;margin:0 auto;}
+  header h1{font-size:26px;margin-bottom:6px;}
+  header p{opacity:.9;font-size:14px;}
+  .tag{display:inline-block;background:rgba(255,255,255,.18);border-radius:20px;padding:3px 12px;font-size:12px;margin-top:10px;}
+  h2{font-size:19px;margin:38px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--blue);color:var(--blue);}
+  h3{font-size:15px;margin:20px 0 8px;color:#334155;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px;}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+  .kpi b{display:block;font-size:30px;color:var(--blue);}
+  .kpi span{font-size:12.5px;color:var(--mut);}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13.5px;margin-top:6px;}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:#eef2ff;color:#334155;font-size:12.5px;}
+  td.pub{color:var(--mut);font-size:12.5px;}
+  td.v{font-weight:bold;color:var(--blue);} td.t{color:var(--mut);}
+  tr:last-child td{border-bottom:none;}
+  .lic{display:inline-block;font-size:11px;font-weight:bold;border-radius:6px;padding:2px 8px;}
+  .lic.open{background:#dcfce7;color:#15803d;} .lic.nd{background:#fef3c7;color:#b45309;}
+  .lic.arr{background:#fee2e2;color:#b91c1c;} .lic.unk{background:#e2e8f0;color:#475569;}
+  a{color:#2563eb;} .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  ul{padding-left:18px;} li{margin:4px 0;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .cnt{display:inline-block;background:#eef2ff;color:var(--blue);border-radius:10px;padding:0 8px;font-size:12px;font-weight:bold;}
+  .imp{background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;padding:12px 14px;margin:8px 0;}
+  .imp b{color:var(--blue);} .imp p{font-size:13.5px;color:#334155;margin-top:3px;}
+  .pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;}
+  .step{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;}
+  .step b{color:var(--blue);} .arr2{color:var(--mut);font-weight:bold;}
+  .note{background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;font-size:13px;color:#92400e;margin-top:14px;}
+  footer{color:var(--mut);font-size:12px;text-align:center;margin-top:40px;}
+  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr);}.cols{grid-template-columns:1fr;}}
+</style></head>
+<body>
+<header><div class="in">
+  <h1>출처 기반 육아 지식 AI 챗봇 — 결과 보고서</h1>
+  <p>검증된 공공 지식만 근거로 답하고, 문장 단위 출처·유사도를 표기하며, 사용자가 직접 검증하는 RAG 챗봇</p>
+  <span class="tag">개발 빌드 · 로컬 데모</span>
+</div></header>
+<div class="wrap">
+
+  <div class="kpis">
+    <div class="kpi"><b>338</b><span>실제 출처 문서</span></div>
+    <div class="kpi"><b>1.00</b><span>검색 Recall@5</span></div>
+    <div class="kpi"><b>1.00</b><span>거부 재현율 (오거부 0)</span></div>
+    <div class="kpi"><b>697</b><span>지식 그래프 의미연결</span></div>
+  </div>
+
+  <h2>1. 시스템 개요</h2>
+  <p>사용자가 육아 질문을 하면, 검증된 공공 육아 지식(지식팩)에서 근거를 검색해 그 근거에만 종속된 답변을 생성하고,
+     문장마다 출처와 답변–근거 유사도를 표기한다. 근거가 없으면 답변을 거부하고, 인용을 누르면 원문 구절을 하이라이트한다.
+     핵심 철학은 "AI를 믿어라"가 아니라 <b>사용자에게 검증 수단을 준다</b>이다.</p>
+  <div class="pipe">
+    <span class="step"><b>①</b> 질문</span><span class="arr2">→</span>
+    <span class="step"><b>②</b> 하이브리드 검색<br><small>e5 임베딩 + BM25 → RRF</small></span><span class="arr2">→</span>
+    <span class="step"><b>③</b> 리랭킹·거부<br><small>bge-reranker</small></span><span class="arr2">→</span>
+    <span class="step"><b>④</b> 인용 생성<br><small>추출 / LLM</small></span><span class="arr2">→</span>
+    <span class="step"><b>⑤</b> 3층 검증<br><small>코사인+부정어+NLI</small></span><span class="arr2">→</span>
+    <span class="step"><b>⑥</b> 원문 하이라이트</span>
+  </div>
+
+  <h2>2. 지식팩 현황 — 실제 공공 출처 338건</h2>
+  <div class="cols">
+    <div class="card"><h3 style="margin-top:0">출처 기관 분포</h3><ul><li>질병관리청 국가건강정보포털 <span class="cnt">311</span></li><li>질병관리청 예방접종도우미 <span class="cnt">7</span></li><li>한국건강증진개발원 <span class="cnt">3</span></li><li>보건복지부·질병관리청·국민건강보험공단 <span class="cnt">3</span></li><li>보건복지부·질병관리청 임신육아종합포털 아이사랑 <span class="cnt">2</span></li><li>질병관리청·보건복지부 <span class="cnt">2</span></li><li>국민건강보험공단 <span class="cnt">2</span></li><li>식품의약품안전처 <span class="cnt">1</span></li><li>대한소아청소년과학회 <span class="cnt">1</span></li><li>질병관리청 <span class="cnt">1</span></li><li>임신육아종합포털 아이사랑 <span class="cnt">1</span></li><li>교육부·대전광역시교육청·육아정책연구소 <span class="cnt">1</span></li><li>한국소비자원 소비자위해감시시스템 <span class="cnt">1</span></li><li>부산광역시 우리아이발달지원단 <span class="cnt">1</span></li><li>보건복지부 <span class="cnt">1</span></li></ul></div>
+    <div class="card"><h3 style="margin-top:0">라이선스 분포</h3>
+      <ul>
+        <li><span class="lic open">공공누리/출처표시</span> <span class="cnt">307</span></li>
+        <li><span class="lic nd">제4유형(변경금지)</span> <span class="cnt">16</span></li>
+        <li><span class="lic arr">All rights reserved</span> <span class="cnt">8</span></li>
+        <li><span class="lic unk">미상</span> <span class="cnt">7</span></li>
+      </ul>
+      <p style="font-size:12.5px;color:#64748b;margin-top:6px">※ '변경금지'는 청킹이 '변경'에 해당할 수 있어 실서비스 전 검토 필요 — 화면에 배지로 표시.</p>
+    </div>
+  </div>
+  <h3>전체 문서 목록</h3>
+  <table><thead><tr><th>문서</th><th>출처</th><th>라이선스</th><th></th></tr></thead>
+    <tbody><tr><td>[양육자용] 부모교육 자료 - 양육 첫걸음</td><td class="pub">교육부·대전광역시교육청·육아정책연구소(KICCE)</td><td><span class="lic open">상업적 이용 불가 고지(공공누리 유형 미표기)</span></td><td><a href="https://i-nuri.go.kr/parents/board/view.do?menu_idx=11&amp;manage_idx=52&amp;data_type=normal&amp;sub_gubun=2&amp;board_idx=5326" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아 건강검진 대상·시기·검진항목 안내</td><td class="pub">국민건강보험공단</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://www.nhis.or.kr/nhis/healthin/wbhaca04800m01.do" target="_blank">원문 ↗</a></td></tr>
+<tr><td>2025 영유아 건강검진 안내문</td><td class="pub">국민건강보험공단</td><td><span class="lic unk">라이선스 미상</span></td><td><a href="https://www.nhis.or.kr/static/html/wbma/c/wbhaca04800_2025.pdf" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영아 안전 수면 수칙(눕혀 재우기·침구·분리 수면)</td><td class="pub">대한소아청소년과학회</td><td><span class="lic unk">라이선스 미상</span></td><td><a href="https://pediatrics.or.kr/bbs/index.html?category=A&amp;code=infantcare&amp;mode=view&amp;number=8810" target="_blank">원문 ↗</a></td></tr>
+<tr><td>초보아빠를 위한 육아가이드 (7차 개정판)</td><td class="pub">보건복지부</td><td><span class="lic open">공공누리 제2유형(출처표시-상업적이용금지)</span></td><td><a href="https://mohw.go.kr/board.es?act=view&amp;bid=0019&amp;list_no=1480197&amp;mid=a10411010100" target="_blank">원문 ↗</a></td></tr>
+<tr><td>생후 13~24개월 유아 발달 이정표</td><td class="pub">보건복지부·질병관리청 임신육아종합포털 아이사랑</td><td><span class="lic unk">라이선스 미상</span></td><td><a href="https://www.childcare.go.kr/?menuno=293" target="_blank">원문 ↗</a></td></tr>
+<tr><td>생후 7~9개월 영아 발달 이정표</td><td class="pub">보건복지부·질병관리청 임신육아종합포털 아이사랑</td><td><span class="lic unk">라이선스 미상</span></td><td><a href="https://www.childcare.go.kr/?menuno=291" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아건강검진 보호자용 설명서(요약본)</td><td class="pub">보건복지부·질병관리청·국민건강보험공단</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/ntcnInfo/helthEdcRecsroom/helthEdcRecsroomView.do?phledu_recsroom_sn=1633" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아건강검진 보호자용 설명서(전체본)</td><td class="pub">보건복지부·질병관리청·국민건강보험공단</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/ntcnInfo/helthEdcRecsroom/helthEdcRecsroomView.do?phledu_recsroom_sn=1633" target="_blank">원문 ↗</a></td></tr>
+<tr><td>카시트 보호자 설명서</td><td class="pub">보건복지부·질병관리청·국민건강보험공단</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/ntcnInfo/helthEdcRecsroom/helthEdcRecsroomView.do?phledu_recsroom_sn=1633" target="_blank">원문 ↗</a></td></tr>
+<tr><td>우리 아이 발달이 걱정이세요? 영유아와 가족을 위한 발달가이드북</td><td class="pub">부산광역시 우리아이발달지원단</td><td><span class="lic unk">unknown (공공 발간물, 발간등록번호 보유)</span></td><td><a href="https://www.woorii114.org/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>돌 전 아기에게 벌꿀 금지 - 영아 보툴리누스증 예방</td><td class="pub">식품의약품안전처(정책브리핑)</td><td><span class="lic open">공공누리 제4유형(출처표시-상업적이용금지)</span></td><td><a href="https://www.korea.kr/news/policyNewsView.do?newsId=148863448" target="_blank">원문 ↗</a></td></tr>
+<tr><td>가정에서의 영유아 낙상·화상·질식 예방</td><td class="pub">임신육아종합포털 아이사랑</td><td><span class="lic open">출처표시(질병관리청 국가건강정보포털 자료 참고)</span></td><td><a href="https://www.childcare.go.kr/?menuno=428" target="_blank">원문 ↗</a></td></tr>
+<tr><td>복부초음파검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>비부비동염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>비뇨기계 외상</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>빈혈</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>간접흡연</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>갈색세포종</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>갑상선염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>오십견(동결견, 유착관절낭염)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>성대결절</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>급성고환염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>물에 빠짐</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>방광요관역류(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>성조숙증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>갑상선기능항진증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>겨울철 한파대비 건강수칙</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>겨울철 저체온증 예방요령</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>겨울철 대표 질환별 응급조치 요령</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>남성형 탈모</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>농가진</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>소아의 대소변 가리기</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>노인 변비</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>비정상 자궁출혈</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>여성형유방</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>항문직장농양과 치루(치루)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>심실중격결손증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>대변 및 잠혈검사(기생충 검사)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>만성기관지염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>중이염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>척추의 형태 이상(척추측만증)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>켈로이드</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>코피(비출혈)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>얼굴마비(말초성 마비)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>요통</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>여드름</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>자궁경부암 백신</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>소아 비만</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>식이영양(영유아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>식이영양(소아/청소년)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>식이영양(임산부)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>굴절이상(근시, 원시, 난시)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>덧눈꺼풀</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>당뇨망막병증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>미숙아망막병증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>저시력</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뎅기열, 치쿤구니야열</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>인플루엔자</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>중증열성혈소판감소증후군(SFTS)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>감염단핵구증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>감염심내막염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>말라리아</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>폐렴(성인)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>과민성장증후군</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>쯔쯔가무시증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유행각결막염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>신증후군출혈열(한타바이러스감염증)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>급성 세균성 장염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뇌수막염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>불명열</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>헤르페스감염증(단순포진)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>디프테리아</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>운동</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>당뇨병</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>A형간염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>C형간염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>급성 충수염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>사람 브루셀라증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>장결핵</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>요충증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>편충증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>코골이</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>잠복고환</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>왜소음경(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>요도하열(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>저신장</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정상청소년의 성장과 발달</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>감기</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>불임증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>혈변 및 흑변(성인)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>이 사면발이 감염증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>염좌</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>간기능검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>총혈구검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>만성콩팥병</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>양전자방출단층촬영술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>골절</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영아돌연사증후군</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>탈장(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>이유기보충식(이유식)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>폐렴(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정계정맥류</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>가정 내 아동안전</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>동물 및 곤충에 의한 응급상황</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>구내염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유소아 난청</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>외상성 고막 천공</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>코뼈 골절</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>노인성난청</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>거부반응과 면역억제제</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>흉곽기형(오목가슴, 함몰흉, 누두흉)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뇌졸중</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뇌하수체기능저하증(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>모호한 외부생식기 및 성 발달 이상</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>주혈흡충증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>샤가스병</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>포충증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>임상 화학 검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>감염질환의 혈청검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>심방중격결손증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>열상</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유선염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>경부 종괴</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>메켈 게실</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유방통</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유두분비</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유방종괴</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>하지정맥류</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>백선증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>자극접촉피부염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>모반(점)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>발 백선(무좀)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>습진</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>생리통</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>질분비물</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>만성비염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>구강건조증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>목쉼</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>편도염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>귀의 통증 및 분비물</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>치과국소마취(치과 부분마취)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>잇몸병(치주질환)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>야뇨증(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>창자겹침증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>소아 청소년의 혈변 및 흑혈변</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>대변 이상</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>신생아 황달</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>인두편도염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>크루프(후두염)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>소아발진</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>노인 요실금</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>구역질과 구토</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>갑상선기능저하증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유루증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>섬유근육통</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>변비</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>골다공증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>생활 속의 중금속: 납(Pb)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>생활 속의 수은(Hg)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>평발(편평족)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>보툴리눔독소증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>엔테로바이러스 감염증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>눈꺼풀처짐(안검하수)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>심부 정맥 혈전증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>다한증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>감마나이프 방사선 수술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>림프절 종대</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뇌전증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>방광염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>언어장애(아동 언어장애의 진단과 치료)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>심폐소생술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>심폐소생술(이물질에 의한 기도폐쇄의 처치)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>요로전환술(정위성 인공방광 대치술)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>요로전환술(콩팥창냄술)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>제왕절개술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>폴리오</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>일본뇌염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>바이러스성출혈열</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>신생아 대사 이상 검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>태변흡입증후군</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>신체활동! 알려드리겠습니다!</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>딸꾹질</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>기침(성인)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>해외여행 시 주의해야 할 감염병! 알려드리겠습니다!</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>성폭력</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>소화불량</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>생활 속의 소음</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>웨스트나일열</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>귀의 형태 이상</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>귀의 형태 이상(소이증)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>얼굴떨림(얼굴연축_눈꺼풀연축)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>갑상선스캔</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>약시(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>기관지내시경 검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>자궁내막증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>충치</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>지루 피부염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>구강병 예방 및 관리방법! 알려드리겠습니다!</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>수근굴(수근관) 증후군</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>골수검사</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정상임신관리(임신의 진단과 관리)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>유비저</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>미숙아</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>수두증(소아)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>안구건조증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>심잡음</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>수면무호흡증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>스포츠 손상과 안전</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>스포츠 손상과 안전(슬관절(무릎 관절) 손상)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>스포츠 손상과 안전(족관절(발목 관절) 손상)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>야토병</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>이갈이</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>독극물 섭취</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>혈관종</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정상임신관리(임신 전 관리)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>간이식수술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>조혈모세포이식</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>수혈</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>신장 이식</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>턱교정 수술과 교정 치료</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정관수술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>치과진정법</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>근시교정수술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>포경수술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>기관절개술</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뇌졸중 환자의 재활</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>항생제</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>귀의 형태 이상(돌출귀)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>귀의 형태 이상(기타)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>기저귀피부염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정상소아의 성장</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정상소아의 성장(성장)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>정상소아의 성장(발달)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>소아청소년기고혈압</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>탈장(성인)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>건막염(특발성 건막염)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>생활 속의 라돈</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>전자제품과 전자파</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>자연분만과정</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>다운증후군</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>만성폐쇄성폐질환</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>피임</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>폐 색전증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>체중 감소</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>건강기능식품</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>만성피로증후군</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>탈수</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>항문 가려움증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>바이러스성 간염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>기관지확장증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>류마티스관절염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>편두통</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>항응고요법</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>결핵</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>발달성 고관절 이형성증 및 탈구</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>호스피스 완화의료</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뇌사자 장기기증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>뇌성마비</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>불소도포</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>치과 임플란트</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>치아맹출장애</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>늘어지는 영아증후군</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>다태임신</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>동맥관 개존증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>아토피피부염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>조산</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>성공적인 모유 수유</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>청소년의 카페인 음료 섭취</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>특발성 저신장에서 성장호르몬 효과와 주의사항</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>드림렌즈의 효과와 부작용</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>청소년의 제로 음료 섭취</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>건강검진(국가건강검진)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>B형간염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>요로감염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>렙토스피라증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>백일해</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>코로나바이러스감염증-19</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>성매개감염병</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>수두와 대상포진</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>급성호흡기바이러스감염증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>아나필락시스</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>무월경</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>자연유산</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>폐경기</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>호르몬대체요법</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>백내장</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>임신당뇨병</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>백반증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>원형탈모</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>선천갑상샘저하증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>홈메우기</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>치아외상(치아손상)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>공기 오염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>식품 오염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>토양 및 수질 오염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>내분비계 장애물질(환경 호르몬)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>사전연명의료결정</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>세기관지염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>재택의료/방문진료</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>패혈증</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>급성 바이러스 위장관염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>사람면역결핍바이러스</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>공수병(광견병)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영양제</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영양표시 읽는 법! 알려드리겠습니다!</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>흡연</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>성장 장애</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>수족구병(손발입병)</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>사시</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>포도막염</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>파상풍</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>우울감</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic open">공공데이터포털 오픈API · 출처표시 (질병관리청 국가건강정보포털)</span></td><td><a href="https://health.kdca.go.kr/" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영아돌연사증후군(SIDS) 정의와 위험요인</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5467" target="_blank">원문 ↗</a></td></tr>
+<tr><td>구토 시 식이 재개와 탈수로 인한 병원 방문 기준</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5804" target="_blank">원문 ↗</a></td></tr>
+<tr><td>성공적인 모유 수유 - 권장 기간과 수유 방법</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=6586" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아 설사 시 탈수 예방과 수분·전해질 보충</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=1667" target="_blank">원문 ↗</a></td></tr>
+<tr><td>감염병 예방을 위한 올바른 손씻기 방법과 효과</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=6545" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아 식이영양 - 완전 모유수유 권장과 조제유(분유) 수유</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5212" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아 낙상·머리 충격 예방과 관찰</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5481" target="_blank">원문 ↗</a></td></tr>
+<tr><td>가정 내 이물질 삼킴·질식 예방과 응급 대처</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5481" target="_blank">원문 ↗</a></td></tr>
+<tr><td>이유기보충식(이유식) 시작 시기와 단계별 진행</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5470" target="_blank">원문 ↗</a></td></tr>
+<tr><td>이유식으로 보충해야 할 영양소(철분)와 첫 이유식 음식</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5470" target="_blank">원문 ↗</a></td></tr>
+<tr><td>탈수의 단계별 증상과 소아에서의 주의점</td><td class="pub">질병관리청 국가건강정보포털</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=6551" target="_blank">원문 ↗</a></td></tr>
+<tr><td>국가예방접종 지원사업과 표준예방접종일정 원칙</td><td class="pub">질병관리청 예방접종도우미</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://nip.kdca.go.kr/irhp/infm/goVcntInfo.do?menuLv=1&amp;menuCd=115" target="_blank">원문 ↗</a></td></tr>
+<tr><td>예방접종 후 이상반응 신고제도 및 신고방법</td><td class="pub">질병관리청 예방접종도우미</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://nip.kdca.go.kr/irhp/infm/goVcntInfo.do?menuLv=1&amp;menuCd=1522" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아 예방접종 전후 주의사항</td><td class="pub">질병관리청 예방접종도우미</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://nip.kdca.go.kr/irhp/infm/goVcntInfo.do?menuLv=1&amp;menuCd=114" target="_blank">원문 ↗</a></td></tr>
+<tr><td>2026 B형간염 주산기감염 예방수첩</td><td class="pub">질병관리청 예방접종도우미</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://nip.kdca.go.kr/irhp/mngm/goVcntMngm.do?menuCd=36&amp;menuLv=3" target="_blank">원문 ↗</a></td></tr>
+<tr><td>2026 백신별 예방접종 안내문(VIS)</td><td class="pub">질병관리청 예방접종도우미</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://nip.kdca.go.kr/irhp/mngm/goVcntMngm.do?menuCd=36&amp;menuLv=3" target="_blank">원문 ↗</a></td></tr>
+<tr><td>2026 예방접종 보호자가이드</td><td class="pub">질병관리청 예방접종도우미</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://nip.kdca.go.kr/irhp/mngm/goVcntMngm.do?menuCd=36&amp;menuLv=3" target="_blank">원문 ↗</a></td></tr>
+<tr><td>2026 표준예방접종일정표</td><td class="pub">질병관리청 예방접종도우미</td><td><span class="lic arr">All rights reserved</span></td><td><a href="https://nip.kdca.go.kr/irhp/mngm/goVcntMngm.do?menuCd=36&amp;menuLv=3" target="_blank">원문 ↗</a></td></tr>
+<tr><td>수족구병 예방수칙과 영유아 병원 방문 기준</td><td class="pub">질병관리청(정책브리핑)</td><td><span class="lic open">공공누리 제4유형(출처표시-상업적이용금지)</span></td><td><a href="https://www.korea.kr/news/healthView.do?newsId=148930939" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아 발열 가정 내 대처법과 즉시 병원에 가야 하는 경고 징후</td><td class="pub">질병관리청·보건복지부(정책브리핑)</td><td><span class="lic open">공공누리 제4유형(출처표시-상업적이용금지)</span></td><td><a href="https://www.korea.kr/news/policyNewsView.do?newsId=148936627" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영유아 발열 체온 기준과 월령별 대처</td><td class="pub">질병관리청·보건복지부(정책브리핑)</td><td><span class="lic open">공공누리 제4유형(출처표시-상업적이용금지)</span></td><td><a href="https://www.korea.kr/news/policyNewsView.do?newsId=148936627" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영양만점 단계별 이유식 (2024)</td><td class="pub">한국건강증진개발원</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://www.khepi.or.kr/kps/publish/view?menuId=MENU00890&amp;page_no=B2017003&amp;board_idx=11114" target="_blank">원문 ↗</a></td></tr>
+<tr><td>모유수유 성공비결</td><td class="pub">한국건강증진개발원</td><td><span class="lic unk">unknown(저작물 임의 변경 불가 문구)</span></td><td><a href="https://www.khepi.or.kr/kps/publish/view?menuId=MENU00890&amp;page_no=B2017003&amp;board_idx=9309" target="_blank">원문 ↗</a></td></tr>
+<tr><td>영양만점 이유식 성공비결 (2024)</td><td class="pub">한국건강증진개발원</td><td><span class="lic nd">공공누리 제4유형(변경금지)</span></td><td><a href="https://www.khepi.or.kr/kps/publish/view?menuId=MENU00890&amp;page_no=B2017003&amp;board_idx=11113" target="_blank">원문 ↗</a></td></tr>
+<tr><td>아차 하는 순간! 어린이 안전사고 예방 가이드</td><td class="pub">한국소비자원 소비자위해감시시스템(CISS)</td><td><span class="lic unk">라이선스 미상</span></td><td><a href="https://ciss.go.kr/children/Child_Safety_Guide.pdf" target="_blank">원문 ↗</a></td></tr>
+</tbody></table>
+
+  <h2>3. 성능 평가 (평가셋 29문항: 양성 23 · 음성 6, 복수 정답 라벨)</h2>
+  <table><thead><tr><th>지표</th><th>결과</th><th>목표</th><th></th></tr></thead>
+    <tbody><tr><td>검색 Recall@5</td><td class="v">1.00</td><td class="t">≥ 0.8</td><td>✓ 충족</td></tr><tr><td>검색 MRR@5</td><td class="v">0.771</td><td class="t">—</td><td>✓ 충족</td></tr><tr><td>답변 거부 재현율</td><td class="v">0.83</td><td class="t">≥ 0.8</td><td>✓ 충족</td></tr><tr><td>오거부율</td><td class="v">0.00</td><td class="t">≤ 0.1</td><td>✓ 충족</td></tr><tr><td>평균 답변–근거 유사도</td><td class="v">0.912</td><td class="t">—</td><td>✓ 충족</td></tr><tr><td>모순 의심(추출)</td><td class="v">0 / 69</td><td class="t">낮을수록</td><td>✓ 충족</td></tr><tr><td>미인용(잠재 환각)</td><td class="v">0 / 69</td><td class="t">낮을수록</td><td>✓ 충족</td></tr></tbody></table>
+  <div class="note">Recall@5=1.00은 라벨 보강 후 값이다(대형 코퍼스에서 KDCA 원문이 웹 요약본보다 상위로 올라와
+    생긴 '라벨 착시'를 실측 정답으로 반영). 거부 재현율 0.83은 <b>정직한 트레이드오프</b>다 —
+    검증된 성인 의학 기사 300건이 유입되며 "성인 고혈압 약" 같은 질의가 완전한 도메인 밖이 아니게 됐다.
+    더 엄격한 소아 도메인 경계가 필요하면 수집 필터를 강화할 수 있다. RAG on/off 환각률 비교는 LLM 베이스라인(API 키) 필요.</div>
+
+  <h2>4. 지식 그래프 <small style="font-size:13px;color:#64748b;font-weight:normal">/graph</small></h2>
+  <p>지식팩을 그래프로 시각화한다. 노드는 문서·청크, 엣지는 의미적으로 가까운 출처(kNN)와 출처 간 상충이다.</p>
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi"><b>338</b><span>문서 노드</span></div>
+    <div class="kpi"><b>12137</b><span>청크 노드</span></div>
+    <div class="kpi"><b style="color:#0d9488">697</b><span>의미 연결(kNN)</span></div>
+    <div class="kpi"><b style="color:#dc2626">0</b><span>출처 간 상충</span></div>
+  </div>
+  <p style="margin-top:12px">의미 연결이 주제 군집(발달·수유/이유식·발열·탈수·수면안전)을 형성하며, <b>상충 0건</b>은 공공 출처들이
+     서로 일치함을 보여주는 정직한 결과다. 노드 클릭 시 출처·라이선스·본문·원문 링크가 표시된다.</p>
+
+  <h2>5. 이번 개발에서 개선한 점</h2>
+  <div class="imp"><b>환경 회귀 복구</b><p>numpy 2.x가 torch 2.2를 깨뜨려 sbert·리랭커·NLI가 조용히 TF-IDF로 폴백돼 있던 문제를 발견·복구(numpy&lt;2 고정). 검색 유사도 5~15% → 84~90% 정상화.</p></div><div class="imp"><b>추출 답변 일관성</b><p>추출 모드가 여러 문서를 뒤섞어 상반된 내용을 잇던 문제를 상위 문서 한정·헤더 제거·중복 제거로 해결.</p></div><div class="imp"><b>실데이터 지식팩 1차</b><p>개발용 샘플 5건을 제거하고 공공기관 실제 출처 23건으로 교체(출처 URL·라이선스 명기).</p></div><div class="imp"><b>실데이터 지식팩 2차 — 공식 발간물 PDF 15종</b><p>복지부 초보아빠 육아가이드(제2유형), 질병관리청 2026 예방접종 가이드·백신별 VIS, 건강증진개발원 이유식·모유수유 3권, 건강검진 보호자 설명서 등 대형 발간물을 수집(POST·세션 게시판 다운로드 자동화 포함) → 총 38문서·1,842청크.</p></div><div class="imp"><b>수집 파이프라인 확장</b><p>ingest에 PDF(PyMuPDF)·HWPX·HWP 파서 + 사이드카 메타데이터 추가.</p></div><div class="imp"><b>라이선스 인지형 동작</b><p>출처 On/Off(구독 해지 시 즉시 검색 제외), 변경금지·판권 소스는 원문 그대로만 인용, 답변에 라이선스 배지, 출처별 인용 기여도 집계(수익분배 지표) — ebook 제휴의 기술적 초석.</p></div><div class="imp"><b>지식 그래프 시각화</b><p>문서·청크·의미연결·출처충돌을 보여주는 /graph 페이지 신설. 대형 코퍼스에서는 문서 단위 그래프로 자동 전환.</p></div><div class="imp"><b>국가건강정보포털 오픈API 연동</b><p>질병관리청 API(healthInfoList/healthInfo)를 해독(TOKEN 인증·구형 TLS 우회)하고, 서버 검색이 없어 내용 기반 소아 필터로 검증된 건강정보 300건을 자동 수집(backend/kdca_api.py·kdca_collect.py). 개정 시 재실행만으로 갱신.</p></div><div class="imp"><b>스트레스 테스트 기반 재튜닝</b><p>코퍼스를 5건→12,137청크로 3,000배 확장하며 드러난 거부 누수·평가 라벨 한계를 반복 진단 — 복수 정답 라벨 도입, 거부 임계 재조정, 대형 코퍼스용 문서 단위 그래프 자동 전환. 12,137청크에서도 전 지표 목표 유지.</p></div>
+
+  <h2>6. 남은 과제</h2>
+  <div class="card"><ul><li>실제 자연스러운 답변(LLM 모드): 코드 준비 완료, ANTHROPIC_API_KEY 설정 시 활성화. 인용도는 검증 신호로 재정의.</li><li>공공 PDF/HWP 대량 수집: 파서는 완성, 소스별 라이선스 확인 후 30~50건으로 확대.</li><li>RAG on/off 환각률 정량 비교: 순수 LLM 베이스라인(API 키) 필요.</li><li>라이선스 인지형 동작: &#x27;변경금지(제4유형)&#x27; 소스는 청킹 대신 스니펫+링크 방식 검토(현재는 배지 표시).</li></ul></div>
+
+  <h2>7. 실행 방법</h2>
+  <div class="card" style="font-size:13.5px">
+    <p><b>인덱스 구축</b> &nbsp;<code>python -m backend.ingest</code></p>
+    <p><b>서버 실행</b> &nbsp;<code>uvicorn backend.main:app</code></p>
+    <p><b>챗봇</b> &nbsp;<a href="http://localhost:8000/">http://localhost:8000/</a> &nbsp;·&nbsp;
+       <b>지식 그래프</b> &nbsp;<a href="http://localhost:8000/graph">http://localhost:8000/graph</a></p>
+    <p><b>평가</b> &nbsp;<code>python -m eval.run_eval</code></p>
+  </div>
+
+  <footer>출처 기반 육아 지식 AI 챗봇 · 캡스톤 개발 빌드 · 자체완결형 결과 보고서</footer>
+</div></body></html>

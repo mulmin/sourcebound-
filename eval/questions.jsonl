@@ -1,0 +1,29 @@
+{"question": "신생아는 어떤 자세로 재워야 안전한가요?", "relevant_docs": ["sids_정의_위험요인", "수면_안전수칙", "영유아건강검진_보호자설명서_요약본", "영유아건강검진_보호자설명서_전체본"], "is_negative": false}
+{"question": "영아돌연사증후군 위험을 줄이려면 어떻게 재워야 하나요?", "relevant_docs": ["sids_정의_위험요인", "수면_안전수칙"], "is_negative": false}
+{"question": "아기 침대에 베개나 인형을 두어도 되나요?", "relevant_docs": ["수면_안전수칙", "sids_정의_위험요인", "안전_가정낙상화상"], "is_negative": false}
+{"question": "아기가 단추형 배터리를 삼켰어요 어떻게 하나요?", "relevant_docs": ["안전_질식이물질", "어린이안전사고예방가이드"], "is_negative": false}
+{"question": "아기가 침대에서 떨어져 머리를 부딪혔어요", "relevant_docs": ["안전_낙상머리충격", "어린이안전사고예방가이드", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "생후 2개월 아기가 열이 나면 어떻게 하나요?", "relevant_docs": ["발열_체온기준_월령", "발열_가정대처_경고징후", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "아기 열이 39도인데 해열제 먹여도 되나요?", "relevant_docs": ["발열_가정대처_경고징후", "발열_체온기준_월령", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "미온수로 아이 열을 내려도 되나요?", "relevant_docs": ["발열_가정대처_경고징후", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "아기가 설사를 하는데 무엇을 먹여야 하나요?", "relevant_docs": ["설사_탈수_수분보충", "탈수_단계별증상", "kdca_5722_대변_이상", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "아기 탈수 증상은 어떻게 알 수 있나요?", "relevant_docs": ["탈수_단계별증상", "설사_탈수_수분보충", "kdca_6551_탈수"], "is_negative": false}
+{"question": "아기가 토한 뒤에 무엇을 먹이나요?", "relevant_docs": ["구토_식이재개", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "손은 어떻게 씻어야 감염을 예방하나요?", "relevant_docs": ["손씻기_감염예방"], "is_negative": false}
+{"question": "수족구병에 걸리면 어린이집은 언제 보내나요?", "relevant_docs": ["수족구_예방수칙"], "is_negative": false}
+{"question": "이유식은 언제부터 시작하나요?", "relevant_docs": ["이유식_시작시기_단계", "이유식성공비결2024", "단계별이유식2024", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "이유식에서 철분은 어떻게 보충하나요?", "relevant_docs": ["이유식_영양_철분", "이유식성공비결2024", "단계별이유식2024", "kdca_5470_이유기보충식(이유식)"], "is_negative": false}
+{"question": "돌 전에 꿀을 먹여도 되나요?", "relevant_docs": ["꿀금지_보툴리누스", "이유식성공비결2024", "단계별이유식2024", "초보아빠육아가이드2024"], "is_negative": false}
+{"question": "모유수유는 언제까지 하는 게 좋나요?", "relevant_docs": ["모유수유_권장기간", "모유수유성공비결", "수유_모유분유_조유"], "is_negative": false}
+{"question": "분유는 어떻게 타야 하나요?", "relevant_docs": ["수유_모유분유_조유", "초보아빠육아가이드2024", "모유수유성공비결"], "is_negative": false}
+{"question": "예방접종 후에 주의할 점은 무엇인가요?", "relevant_docs": ["예방접종_전후주의", "예방접종보호자가이드2026", "백신별예방접종안내문2026"], "is_negative": false}
+{"question": "예방접종 간격을 놓쳤는데 처음부터 다시 맞아야 하나요?", "relevant_docs": ["예방접종_국가사업_일정원칙", "예방접종보호자가이드2026", "표준예방접종일정표2026"], "is_negative": false}
+{"question": "예방접종 후 이상반응은 어떻게 신고하나요?", "relevant_docs": ["예방접종_이상반응신고", "예방접종보호자가이드2026", "백신별예방접종안내문2026"], "is_negative": false}
+{"question": "생후 8개월 아기는 무엇을 할 수 있나요?", "relevant_docs": ["발달_7to9개월", "영유아건강검진_보호자설명서_전체본", "초보아빠육아가이드2024", "영유아발달가이드북2022"], "is_negative": false}
+{"question": "영유아 건강검진은 언제 받나요?", "relevant_docs": ["영유아건강검진_대상시기", "영유아건강검진안내문2025", "영유아건강검진_보호자설명서_요약본", "영유아건강검진_보호자설명서_전체본"], "is_negative": false}
+{"question": "주식 투자는 어떻게 시작하나요?", "relevant_docs": [], "is_negative": true}
+{"question": "오늘 서울 날씨 어때?", "relevant_docs": [], "is_negative": true}
+{"question": "파이썬으로 웹 크롤링하는 법 알려줘", "relevant_docs": [], "is_negative": true}
+{"question": "자동차 엔진오일 교체 주기는?", "relevant_docs": [], "is_negative": true}
+{"question": "성인 고혈압 약은 어떻게 복용하나요?", "relevant_docs": [], "is_negative": true}
+{"question": "강아지 예방접종은 언제 하나요?", "relevant_docs": [], "is_negative": true}

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>지식 그래프 — My Private AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; background: #0f172a; color: #e2e8f0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { background: #1e3a8a; color: #fff; padding: 12px 22px; display: flex; align-items: center; gap: 16px; }
+  header b { font-size: 17px; }
+  header small { opacity: .8; }
+  header a { margin-left: auto; color: #bfdbfe; text-decoration: none; font-size: 13px; border: 1px solid #3b5bb5; padding: 6px 12px; border-radius: 8px; }
+  header a:hover { background: #27408f; }
+  #bar { display: flex; gap: 18px; align-items: center; padding: 9px 22px; background: #111c33; border-bottom: 1px solid #1e293b; font-size: 12.5px; flex-wrap: wrap; }
+  .stat b { color: #fff; font-size: 15px; }
+  .stat span { color: #94a3b8; }
+  .leg { display: inline-flex; align-items: center; gap: 6px; color: #cbd5e1; }
+  .swatch { width: 22px; height: 0; border-top-width: 3px; border-top-style: solid; display: inline-block; }
+  main { flex: 1; display: flex; overflow: hidden; }
+  #canvas-wrap { flex: 1; position: relative; }
+  canvas { display: block; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  #panel { width: 340px; background: #0b1220; border-left: 1px solid #1e293b; padding: 18px; overflow-y: auto; font-size: 13.5px; line-height: 1.65; }
+  #panel h3 { font-size: 15px; color: #fff; margin-bottom: 8px; }
+  #panel .muted { color: #64748b; }
+  .badge { display: inline-block; font-size: 11px; font-weight: bold; border-radius: 6px; padding: 2px 8px; margin: 3px 4px 3px 0; }
+  .lic-open { background: #14532d; color: #86efac; }
+  .lic-nd { background: #78350f; color: #fcd34d; }
+  .lic-arr { background: #7f1d1d; color: #fca5a5; }
+  .lic-unk { background: #334155; color: #cbd5e1; }
+  #panel a { color: #93c5fd; word-break: break-all; }
+  .body-txt { margin-top: 10px; color: #cbd5e1; background: #111c33; border-radius: 8px; padding: 10px 12px; }
+  .hint { color: #64748b; margin-top: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <b>지식 그래프</b>
+  <small>문서·청크와 그 사이 의미 유사·출처 상충 관계</small>
+  <a href="/">← 챗봇으로</a>
+</header>
+<div id="bar">
+  <div class="stat"><b id="s-docs">–</b> <span>문서</span></div>
+  <div class="stat"><b id="s-chunks">–</b> <span>청크</span></div>
+  <div class="stat"><b id="s-xsim" style="color:#2dd4bf">–</b> <span>의미 연결(kNN)</span></div>
+  <div class="stat"><b id="s-conflict" style="color:#f87171">–</b> <span>출처 간 상충</span></div>
+  <span class="leg"><span class="swatch" style="border-color:#2dd4bf"></span>의미적으로 가까운 출처</span>
+  <span class="leg"><span class="swatch" style="border-color:#f87171;border-top-style:dashed"></span>출처 간 상충</span>
+</div>
+<main>
+  <div id="canvas-wrap"><canvas id="cv"></canvas></div>
+  <div id="panel"><div class="hint">노드를 클릭하면<br>문서 출처·라이선스·본문이<br>여기에 표시됩니다.</div></div>
+</main>
+<script>
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let W, H, DPR = window.devicePixelRatio || 1;
+const wrap = document.getElementById("canvas-wrap");
+function resize() {
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  cv.width = W * DPR; cv.height = H * DPR; cv.style.width = W + "px"; cv.style.height = H + "px";
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+
+let nodes = [], edges = [], byId = {};
+const view = { x: 0, y: 0, k: 1 };  // pan/zoom
+function color(docIdx, n) { const h = (docIdx * 137.508) % 360; return `hsl(${h} 70% ${n === "doc" ? 55 : 62}%)`; }
+
+function licClass(lic) {
+  if (!lic || lic === "unknown") return ["lic-unk", "라이선스 미상"];
+  if (lic.includes("All rights")) return ["lic-arr", "All rights reserved"];
+  if (lic.includes("변경금지") || lic.includes("ND")) return ["lic-nd", lic];
+  if (lic.includes("공공누리") || lic.includes("출처표시") || lic.includes("CC")) return ["lic-open", lic];
+  return ["lic-unk", lic];
+}
+
+async function load() {
+  resize();
+  const data = await (await fetch("/api/graph")).json();
+  nodes = data.nodes; edges = data.edges;
+  document.getElementById("s-docs").textContent = data.stats.docs;
+  document.getElementById("s-chunks").textContent = data.stats.chunks;
+  document.getElementById("s-xsim").textContent = data.stats.xsim;
+  document.getElementById("s-conflict").textContent = data.stats.conflict;
+  const cx = W / 2, cy = H / 2;
+  nodes.forEach((n, i) => {
+    const a = (i / nodes.length) * Math.PI * 2;
+    n.x = cx + Math.cos(a) * 220 + (Math.random() - .5) * 40;
+    n.y = cy + Math.sin(a) * 220 + (Math.random() - .5) * 40;
+    n.vx = 0; n.vy = 0;
+    n.r = n.type === "doc" ? 9 + Math.min(6, n.size) : 4.5;
+    byId[n.id] = n;
+  });
+  edges.forEach(e => { e.a = byId[e.s]; e.b = byId[e.t]; });
+  for (let i = 0; i < 450; i++) step();  // 레이아웃을 동기 계산(탭 비활성 시 rAF throttle 회피)
+  fitView();
+  draw();
+}
+
+function fitView(pad = 70) {
+  if (!nodes.length) return;
+  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const bw = (x1 - x0) || 1, bh = (y1 - y0) || 1;
+  view.k = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh, 1.5);
+  view.x = (W - (x0 + x1) * view.k) / 2;
+  view.y = (H - (y0 + y1) * view.k) / 2;
+}
+
+// 힘 계수
+const REPULSE = 5200, SPRING = { member: .045, sim: .02, xsim: .03, conflict: .015 };
+const LEN = { member: 46, sim: 90, xsim: 120, conflict: 150 };
+let hover = null, selected = null;
+
+function step() {
+  for (let i = 0; i < nodes.length; i++) {
+    const a = nodes[i];
+    if (a === drag) continue;
+    for (let j = i + 1; j < nodes.length; j++) {
+      const b = nodes[j];
+      let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + .01;
+      const f = REPULSE / d2, d = Math.sqrt(d2);
+      const fx = f * dx / d, fy = f * dy / d;
+      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+    }
+  }
+  for (const e of edges) {
+    const a = e.a, b = e.b; if (!a || !b) continue;
+    let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) + .01;
+    const k = SPRING[e.kind], L = LEN[e.kind];
+    const f = (d - L) * k, fx = f * dx / d, fy = f * dy / d;
+    a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+  }
+  const cx = W / 2, cy = H / 2;
+  for (const n of nodes) {
+    if (n === drag) continue;
+    n.vx += (cx - n.x) * .0016; n.vy += (cy - n.y) * .0016;
+    n.vx *= .86; n.vy *= .86;
+    n.x += n.vx; n.y += n.vy;
+  }
+}
+
+let energy = 1, running = false;
+function loop() {
+  step();
+  energy *= 0.97;
+  draw();
+  if (energy > 0.03) requestAnimationFrame(loop); else running = false;
+}
+function reheat(e) { energy = Math.max(energy, e || 0.6); if (!running) { running = true; requestAnimationFrame(loop); } }
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.save(); ctx.translate(view.x, view.y); ctx.scale(view.k, view.k);
+  const hl = hover || selected;
+  const near = new Set();
+  if (hl) { near.add(hl.id); edges.forEach(e => { if (e.s === hl.id) near.add(e.t); if (e.t === hl.id) near.add(e.s); }); }
+  // edges
+  for (const e of edges) {
+    const a = e.a, b = e.b; if (!a || !b) continue;
+    const on = !hl || (near.has(a.id) && near.has(b.id));
+    if (e.kind === "member") { ctx.strokeStyle = on ? "rgba(148,163,184,.18)" : "rgba(148,163,184,.05)"; ctx.lineWidth = .6; ctx.setLineDash([]); }
+    else if (e.kind === "sim") { ctx.strokeStyle = on ? "rgba(71,85,105,.55)" : "rgba(71,85,105,.12)"; ctx.lineWidth = 1; ctx.setLineDash([]); }
+    else if (e.kind === "xsim") { ctx.strokeStyle = on ? "rgba(45,212,191,.75)" : "rgba(45,212,191,.18)"; ctx.lineWidth = 1.6; ctx.setLineDash([]); }
+    else { ctx.strokeStyle = on ? "rgba(248,113,113,.9)" : "rgba(248,113,113,.25)"; ctx.lineWidth = 1.8; ctx.setLineDash([5, 4]); }
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // nodes
+  for (const n of nodes) {
+    const on = !hl || near.has(n.id);
+    ctx.globalAlpha = on ? 1 : .25;
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7);
+    ctx.fillStyle = color(n.docIdx, n.type);
+    ctx.fill();
+    if (n.type === "doc") { ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.stroke(); }
+    if (n === hl) { ctx.lineWidth = 2.5; ctx.strokeStyle = "#fff"; ctx.stroke(); }
+  }
+  // doc labels
+  ctx.globalAlpha = 1; ctx.font = "600 11px 'Malgun Gothic',sans-serif"; ctx.textAlign = "center";
+  for (const n of nodes) {
+    if (n.type !== "doc") continue;
+    if (hl && !near.has(n.id)) continue;
+    ctx.fillStyle = "rgba(15,23,42,.75)";
+    const label = n.label.length > 16 ? n.label.slice(0, 16) + "…" : n.label;
+    const w = ctx.measureText(label).width;
+    ctx.fillRect(n.x - w / 2 - 4, n.y + n.r + 3, w + 8, 15);
+    ctx.fillStyle = "#e2e8f0"; ctx.fillText(label, n.x, n.y + n.r + 14);
+  }
+  ctx.restore();
+}
+
+// 좌표 변환 & 상호작용
+function toWorld(px, py) { return { x: (px - view.x) / view.k, y: (py - view.y) / view.k }; }
+function pick(px, py) {
+  const p = toWorld(px, py);
+  let best = null, bd = 1e9;
+  for (const n of nodes) { const d = Math.hypot(n.x - p.x, n.y - p.y); if (d < n.r + 6 && d < bd) { bd = d; best = n; } }
+  return best;
+}
+let drag = null, panning = false, last = null;
+cv.addEventListener("mousemove", e => {
+  const px = e.offsetX, py = e.offsetY;
+  if (drag) { const p = toWorld(px, py); drag.x = p.x; drag.y = p.y; drag.vx = drag.vy = 0; reheat(0.35); return; }
+  if (panning) { view.x += px - last.x; view.y += py - last.y; last = { x: px, y: py }; draw(); return; }
+  const h = pick(px, py);
+  if (h !== hover) { hover = h; cv.style.cursor = hover ? "pointer" : "grab"; if (!running) draw(); }
+});
+cv.addEventListener("mousedown", e => {
+  const n = pick(e.offsetX, e.offsetY);
+  if (n) { drag = n; selected = n; showPanel(n); reheat(0.5); }
+  else { panning = true; last = { x: e.offsetX, y: e.offsetY }; }
+});
+window.addEventListener("mouseup", () => { drag = null; panning = false; });
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const s = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+  const mx = e.offsetX, my = e.offsetY;
+  view.x = mx - (mx - view.x) * s; view.y = my - (my - view.y) * s; view.k *= s;
+  if (!running) draw();
+}, { passive: false });
+
+async function showPanel(n) {
+  const panel = document.getElementById("panel");
+  if (n.type === "doc") {
+    const [cls, txt] = licClass(n.license);
+    panel.innerHTML = `<h3>${esc(n.label)}</h3>
+      <div class="muted">${esc(n.publisher || "")}</div>
+      <div><span class="badge ${cls}">${esc(txt)}</span></div>
+      <div style="margin-top:6px">청크 ${n.size}개</div>
+      ${n.url ? `<div style="margin-top:8px"><a href="${esc(n.url)}" target="_blank" rel="noopener">원문 링크 ↗</a></div>` : ""}`;
+  } else {
+    const doc = byId["doc:" + n.doc];
+    panel.innerHTML = `<h3 class="muted" style="font-weight:600">${esc(doc ? doc.label : n.doc)} · 청크</h3>`;
+    const res = await fetch("/api/source/" + encodeURIComponent(n.id.slice(6)));
+    if (res.ok) {
+      const d = await res.json();
+      const [cls, txt] = licClass(d.meta.license);
+      const seg = d.body.slice(d.highlight.start, d.highlight.end);
+      panel.innerHTML += `<div><span class="badge ${cls}">${esc(txt)}</span></div>
+        <div class="body-txt">${esc(seg)}</div>
+        ${d.meta.url ? `<div style="margin-top:8px"><a href="${esc(d.meta.url)}" target="_blank" rel="noopener">원문 링크 ↗</a></div>` : ""}`;
+    }
+  }
+}
+function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+load();
+</script>
+</body>
+</html>

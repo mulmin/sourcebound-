@@ -1,0 +1,38 @@
+# --- 비밀/키 (절대 커밋 금지) ---
+.env
+.env.*
+*.key
+
+# --- 런타임 상태 (소스 On/Off, 인용 집계) ---
+data/runtime_state.json
+
+# --- 베타 사용자 피드백 (아기 건강 등 민감 정보가 담김 — 절대 공개 금지) ---
+data/feedback.jsonl
+
+# --- 인덱스는 커밋한다(14MB) ---
+# 배포 서버에는 원본 PDF를 올리지 않으므로 인덱스를 재생성할 수 없다.
+# 런타임에 반드시 필요하므로 data/index/ 는 추적 대상이다.
+
+# --- 대용량 원본 발간물 PDF (343MB, 공공기관에서 재다운로드 가능) ---
+# GitHub 파일당 100MB 제한에 걸리고 런타임에도 불필요(텍스트는 인덱스에 포함됨).
+data/knowledge_pack/*.pdf
+data/knowledge_pack/*.hwp
+data/knowledge_pack/*.hwpx
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- 모델/캐시 ---
+.cache/
+*.log
+
+# --- OS / 에디터 ---
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/

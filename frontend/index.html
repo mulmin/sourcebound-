@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e3a8a">
+<title>육아 지식 AI — 출처를 확인하는 챗봇</title>
+<style>
+  *{box-sizing:border-box;margin:0}
+  :root{ --blue:#1e3a8a; --line:#e2e8f0; --mut:#64748b; }
+  html,body{height:100%}
+  body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:#f1f5f9;
+       display:flex;flex-direction:column;overflow:hidden;-webkit-text-size-adjust:100%}
+  header{background:var(--blue);color:#fff;padding:11px 16px;display:flex;align-items:center;gap:8px;flex:none}
+  header b{font-size:16px}
+  header small{font-weight:normal;opacity:.75;font-size:11.5px}
+  header .sp{flex:1}
+  .hbtn{background:#27408f;color:#fff;border:1px solid #3b5bb5;border-radius:8px;padding:5px 10px;
+        font-size:12px;cursor:pointer;text-decoration:none}
+  .hbtn:hover{background:#31509f}
+  .devonly{display:none}
+  body.dev .devonly{display:inline-block}
+
+  /* 면책 고지 */
+  #notice{background:#fffbeb;border-bottom:1px solid #fcd34d;color:#92400e;font-size:12.5px;
+          padding:10px 16px;display:flex;gap:8px;align-items:flex-start;flex:none;line-height:1.5}
+  #notice button{margin-left:auto;background:none;border:none;color:#92400e;font-size:17px;cursor:pointer;padding:0 4px}
+
+  main{flex:1;display:flex;gap:14px;padding:14px;overflow:hidden;min-height:0}
+  .panel{background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);
+         display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  #chat{flex:1.25}
+  #viewer{flex:1;border:1px solid #bbf7d0}
+  .panel h2{font-size:14.5px;padding:11px 16px;border-bottom:1px solid var(--line);color:#334155;flex:none;
+            display:flex;align-items:center;gap:8px}
+  #viewer h2{color:#15803d;border-color:#dcfce7}
+  #viewer-close{display:none;margin-left:auto;background:none;border:none;font-size:20px;color:var(--mut);cursor:pointer}
+
+  #messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
+  .msg-q{align-self:flex-end;background:var(--blue);color:#fff;padding:10px 15px;border-radius:18px 18px 4px 18px;max-width:85%;font-size:14.5px;line-height:1.55}
+  .msg-a{align-self:flex-start;background:#f8fafc;border:1px solid #cbd5e1;padding:13px 15px;
+         border-radius:18px 18px 18px 4px;max-width:95%;font-size:14.5px;line-height:1.75}
+  .cite{display:inline-block;background:#dbeafe;color:#1d4ed8;font-weight:bold;font-size:12px;border-radius:5px;
+        padding:2px 7px;margin:0 2px;cursor:pointer;min-height:24px}
+  .cite:hover{background:#bfdbfe}
+  .sim{display:inline-block;font-size:11.5px;font-weight:bold;border-radius:10px;padding:1px 8px;margin-left:2px}
+  .sim.ok{background:#dcfce7;color:#15803d}
+  .sim.warn{background:#fef3c7;color:#b45309}
+  .sim.uncited,.sim.contra{background:#fee2e2;color:#b91c1c}
+  .adv{color:var(--mut);font-style:italic}
+  .warnbox,.contrabox,.conflictbox{border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12.5px;line-height:1.5}
+  .warnbox{background:#fffbeb;border:1px solid #fcd34d;color:#92400e}
+  .contrabox{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b}
+  .conflictbox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412}
+  .sources{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font-size:12.5px}
+  .sources div{color:#1d4ed8;cursor:pointer;margin-top:5px;line-height:1.5}
+  .licb{display:inline-block;font-size:10.5px;font-weight:bold;border-radius:5px;padding:1px 6px}
+  .licb.open{background:#dcfce7;color:#15803d}
+  .licb.nd{background:#fef3c7;color:#b45309}
+  .licb.arr{background:#fee2e2;color:#b91c1c}
+  .licb.unknown{background:#e2e8f0;color:#475569}
+  .refused{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+
+  /* 피드백 */
+  .fb{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--mut)}
+  .fbtn{background:#fff;border:1px solid #cbd5e1;border-radius:16px;padding:5px 13px;cursor:pointer;font-size:13px}
+  .fbtn:hover{background:#f1f5f9}
+  .fbtn.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .fb input{flex:1;min-width:140px;padding:7px 12px;border:1px solid #cbd5e1;border-radius:14px;font-size:12.5px}
+  .fb .done{color:#15803d;font-weight:bold}
+
+  /* 시작 화면 */
+  .welcome{text-align:center;margin:auto;padding:12px;color:var(--mut)}
+  .welcome h3{color:#334155;font-size:16px;margin-bottom:6px}
+  .welcome p{font-size:13px;line-height:1.6;margin-bottom:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .chip{background:#fff;border:1px solid #cbd5e1;border-radius:18px;padding:9px 14px;font-size:13px;
+        cursor:pointer;color:#334155;line-height:1.3}
+  .chip:hover{background:#eef2ff;border-color:#93c5fd}
+
+  form{display:flex;gap:9px;padding:12px;border-top:1px solid var(--line);flex:none}
+  input#q{flex:1;padding:12px 16px;border:1.5px solid #cbd5e1;border-radius:24px;font-size:16px;outline:none}
+  input#q:focus{border-color:var(--blue)}
+  form button{background:var(--blue);color:#fff;border:none;border-radius:24px;padding:0 20px;font-size:14px;cursor:pointer;min-width:64px}
+  form button:disabled{background:#94a3b8;cursor:default}
+
+  #viewer-body{flex:1;overflow-y:auto;padding:14px 16px;font-size:14px;line-height:1.8;color:#475569;white-space:pre-wrap}
+  #viewer-meta{padding:9px 16px;background:#f0fdf4;font-size:12px;color:#166534;border-bottom:1px solid #dcfce7}
+  mark{background:#fef9c3;padding:2px 0;border-radius:3px;font-weight:bold;color:#0f172a}
+  .empty{color:#94a3b8;text-align:center;margin-top:40px;font-size:13px;padding:0 16px;line-height:1.6}
+  .typing{display:inline-block;color:var(--mut);font-size:13.5px}
+
+  /* 출처 관리(개발자) */
+  #srcpanel{display:none;background:#fff;border-bottom:1px solid var(--line);max-height:40vh;overflow-y:auto;padding:12px 16px;flex:none}
+  #srcpanel.open{display:block}
+  .srcrow{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px dashed #eef2f7;font-size:13px}
+  .srcrow .t{flex:1}
+  .srcrow .pub{color:#94a3b8;font-size:11.5px}
+  .ccnt{background:#eef2ff;color:#1d4ed8;border-radius:10px;padding:0 8px;font-size:11.5px;font-weight:bold}
+
+  /* ── 모바일: 채팅 전체화면, 원문은 하단 시트 ── */
+  @media (max-width:760px){
+    header small{display:none}
+    main{padding:0;gap:0}
+    #chat{flex:1;border-radius:0;box-shadow:none}
+    #chat>h2{display:none}
+    /* 하단 시트: transform 대신 display 토글(환경에 따라 transform이 무시되는 경우가 있어
+       동작이 확실한 방식을 쓴다). 슬라이드는 애니메이션으로 보완. */
+    #viewer{position:fixed;left:0;right:0;bottom:0;top:auto;height:72vh;z-index:50;
+            border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:none}
+    #viewer.open{display:flex;animation:sheetUp .25s ease}
+    @keyframes sheetUp{from{margin-bottom:-72vh}to{margin-bottom:0}}
+    #viewer-close{display:block}
+    .msg-a,.msg-q{max-width:100%}
+    #backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40;display:none}
+    #backdrop.open{display:block}
+  }
+</style>
+</head>
+<body>
+<header>
+  <b>육아 지식 AI</b><small>모든 답변에 출처와 근거를 표시합니다</small>
+  <span class="sp"></span>
+  <button class="hbtn devonly" id="btn-src">출처 관리</button>
+  <a class="hbtn devonly" href="/graph">지식 그래프</a>
+</header>
+
+<div id="notice">
+  <span>⚠️ <b>참고용 정보입니다.</b> 공공기관 자료를 근거로 답하지만 진료를 대신할 수 없습니다.
+    아이 상태가 걱정되면 소아청소년과 전문의와 상담하세요. 응급 시 119.</span>
+  <button id="notice-x" aria-label="닫기">×</button>
+</div>
+
+<div id="srcpanel"></div>
+
+<main>
+  <section id="chat" class="panel">
+    <h2>육아 AI 챗봇</h2>
+    <div id="messages"></div>
+    <form id="form">
+      <input id="q" placeholder="육아 고민을 입력하세요…" autocomplete="off" enterkeyhint="send">
+      <button id="send">질문</button>
+    </form>
+  </section>
+  <section id="viewer" class="panel">
+    <h2>원문 확인 <button id="viewer-close" aria-label="닫기">×</button></h2>
+    <div id="viewer-meta" style="display:none"></div>
+    <div id="viewer-body"><div class="empty">답변의 인용 번호 <b>[n]</b> 을 누르면<br>원문에서 해당 구절을 보여줍니다.</div></div>
+  </section>
+</main>
+<div id="backdrop"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const messages = $("#messages"), form = $("#form"), input = $("#q"), sendBtn = $("#send");
+const viewer = $("#viewer"), backdrop = $("#backdrop");
+const LIC_LABEL = {open:"자유이용", nd:"변경금지·원문인용", arr:"AllRights·원문인용", unknown:"조건미상"};
+const SUGGEST = ["신생아는 어떤 자세로 재워야 하나요?","돌 전에 꿀 먹여도 되나요?",
+                 "생후 2개월 아기가 열이 나요","이유식은 언제부터 시작하나요?",
+                 "예방접종 후 열이 나는데 괜찮나요?"];
+
+// 개발자 도구는 ?dev=1 일 때만
+if (new URLSearchParams(location.search).get("dev") === "1") document.body.classList.add("dev");
+// 면책 고지 닫기(재방문 시 유지)
+if (localStorage.getItem("noticeHidden") === "1") $("#notice").style.display = "none";
+$("#notice-x").onclick = () => { $("#notice").style.display = "none"; localStorage.setItem("noticeHidden","1"); };
+
+function showWelcome() {
+  messages.innerHTML = `<div class="welcome">
+    <h3>무엇이 궁금하세요?</h3>
+    <p>질병관리청·보건복지부 등 <b>공공기관 자료</b>를 근거로 답하고,<br>
+       근거가 없으면 <b>답하지 않습니다.</b></p>
+    <div class="chips">${SUGGEST.map(s=>`<button class="chip">${esc(s)}</button>`).join("")}</div>
+  </div>`;
+  messages.querySelectorAll(".chip").forEach(c =>
+    c.onclick = () => { input.value = c.textContent; form.requestSubmit(); });
+}
+showWelcome();
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const question = input.value.trim();
+  if (!question || sendBtn.disabled) return;
+  input.value = ""; input.blur();
+  if (messages.querySelector(".welcome")) messages.innerHTML = "";
+  addBubble("msg-q", question);
+  const thinking = addBubble("msg-a", "");
+  // 응답에 10초 이상 걸리므로 단계별 안내로 '멈춘 느낌'을 없앤다
+  const steps = ["🔎 공공기관 자료에서 근거를 찾는 중…",
+                 "📖 근거를 읽고 답변을 정리하는 중…",
+                 "✅ 출처와 일치하는지 검증하는 중…"];
+  let si = 0;
+  const paint = () => thinking.innerHTML = `<span class="typing">${steps[si]}</span>`;
+  paint();
+  const timer = setInterval(() => { si = Math.min(si + 1, steps.length - 1); paint(); }, 5000);
+  sendBtn.disabled = true;
+  try {
+    const res = await fetch("/api/ask", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify({question})});
+    if (!res.ok) throw new Error("서버 오류 " + res.status);
+    const data = await res.json();
+    thinking.remove();
+    renderAnswer(data, question);
+  } catch (err) {
+    thinking.innerHTML = `<span style="color:#b91c1c">답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.</span>
+      <div style="color:#94a3b8;font-size:12px;margin-top:4px">${esc(String(err.message||err))}</div>`;
+  } finally {
+    clearInterval(timer);
+    sendBtn.disabled = false;
+  }
+});
+
+function addBubble(cls, text) {
+  const d = document.createElement("div");
+  d.className = cls; d.textContent = text;
+  messages.appendChild(d); messages.scrollTop = messages.scrollHeight;
+  return d;
+}
+
+function renderAnswer(data, question) {
+  const div = document.createElement("div");
+  div.className = "msg-a" + (data.refused ? " refused" : "");
+  if (data.refused) {
+    div.innerHTML = `<b>🔒 검증된 자료에서 근거를 찾지 못했습니다.</b><br>
+      정확하지 않은 정보를 드리지 않기 위해 답하지 않습니다. 질문을 바꿔 보시거나 전문가와 상담하세요.`;
+    messages.appendChild(div); messages.scrollTop = messages.scrollHeight; return;
+  }
+  const vs = data.verification || [];
+  let html = "";
+  vs.forEach(v => {
+    const t = esc(v.sentence);
+    if (v.status === "advisory") { html += `<span class="adv">${t}</span> `; return; }
+    let b = "";
+    (v.citations||[]).forEach(n => {
+      const ev = data.evidence[n-1];
+      if (ev) b += `<span class="cite" data-chunk="${ev.chunk_id}">[${n}]</span>`;
+    });
+    if (v.status==="grounded" || v.status==="contradiction") {
+      const pct = Math.round(v.similarity*100);
+      b += v.contradiction ? `<span class="sim contra">⛔ 모순? ${pct}%</span>`
+        : `<span class="sim ${v.similarity<0.45?"warn":"ok"}">${v.similarity<0.45?"⚠ ":""}${pct}%</span>`;
+    } else if (v.status==="uncited") b += `<span class="sim uncited">근거 없음</span>`;
+    html += `${t}${b} `;
+  });
+  const contras = vs.filter(v=>v.contradiction), uncited = vs.filter(v=>v.status==="uncited");
+  const lows = vs.filter(v=>v.warn && !v.contradiction && v.status==="grounded");
+  if (contras.length) html += `<div class="contrabox">⛔ 근거와 <b>다를 수 있는</b> 문장이 ${contras.length}개 있습니다. 원문을 꼭 확인하세요.</div>`;
+  if (lows.length) html += `<div class="warnbox">⚠ 근거가 약한 문장이 ${lows.length}개 있습니다.</div>`;
+  if (uncited.length) html += `<div class="warnbox">⚠ 출처가 표시되지 않은 문장이 ${uncited.length}개 있습니다.</div>`;
+  if (data.conflict) html += `<div class="conflictbox">⚖ 출처 [${data.conflict.between[0]}]와 [${data.conflict.between[1]}]의 내용이 다릅니다. 양쪽 원문을 비교해 보세요.</div>`;
+  html += `<div class="sources"><b>출처</b>` + data.evidence.map(ev=>{
+    const lic = ev.lic_class ? ` <span class="licb ${ev.lic_class}">${LIC_LABEL[ev.lic_class]||""}</span>` : "";
+    return `<div data-chunk="${ev.chunk_id}">[${ev.n}] ${esc(ev.title)}${lic}</div>`;
+  }).join("") + `</div>`;
+  div.innerHTML = html;
+  div.querySelectorAll("[data-chunk]").forEach(el => el.onclick = () => openSource(el.dataset.chunk));
+  div.appendChild(makeFeedback(question, data));
+  messages.appendChild(div); messages.scrollTop = messages.scrollHeight;
+}
+
+function makeFeedback(question, data) {
+  const wrap = document.createElement("div");
+  wrap.className = "fb";
+  wrap.innerHTML = `<span>이 답변이 도움이 됐나요?</span>
+    <button class="fbtn" data-r="up">👍</button><button class="fbtn" data-r="down">👎</button>
+    <input placeholder="의견을 남겨주세요 (선택)">`;
+  let rating = null;
+  const send = async () => {
+    await fetch("/api/feedback", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({question, answer: data.answer||"", rating: rating||"",
+                            comment: wrap.querySelector("input").value, mode: data.mode||""})});
+    wrap.innerHTML = `<span class="done">✓ 의견 감사합니다!</span>`;
+  };
+  wrap.querySelectorAll(".fbtn").forEach(b => b.onclick = () => {
+    rating = b.dataset.r;
+    wrap.querySelectorAll(".fbtn").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    if (!wrap.querySelector("input").value) send();
+  });
+  wrap.querySelector("input").addEventListener("keydown", e => { if (e.key==="Enter") send(); });
+  return wrap;
+}
+
+async function openSource(chunkId) {
+  const res = await fetch("/api/source/" + encodeURIComponent(chunkId));
+  if (!res.ok) return;
+  const d = await res.json();
+  const meta = $("#viewer-meta");
+  meta.style.display = "block";
+  meta.textContent = `${d.meta.title||""} · ${d.meta.publisher||""}`;
+  const body = $("#viewer-body"), {start,end} = d.highlight, t = d.body;
+  body.innerHTML = esc(t.slice(0,start)) + "<mark>" + esc(t.slice(start,end)) + "</mark>" + esc(t.slice(end));
+  viewer.classList.add("open"); backdrop.classList.add("open");
+  const m = body.querySelector("mark");
+  if (m) m.scrollIntoView({behavior:"smooth", block:"center"});
+}
+const closeViewer = () => { viewer.classList.remove("open"); backdrop.classList.remove("open"); };
+$("#viewer-close").onclick = closeViewer; backdrop.onclick = closeViewer;
+
+// 출처 관리(개발자 전용)
+$("#btn-src").onclick = async () => {
+  const p = $("#srcpanel");
+  if (!p.classList.toggle("open")) return;
+  const d = await (await fetch("/api/sources")).json();
+  p.innerHTML = d.sources.map(s=>`<div class="srcrow">
+      <input type="checkbox" data-doc="${s.doc_id}" ${s.enabled?"checked":""}>
+      <span class="t">${esc(s.title)} <span class="pub">${esc(s.publisher)}</span></span>
+      <span class="licb ${s.lic_class}">${esc(s.lic_label)}</span>
+      <span class="ccnt">인용 ${s.cited}</span></div>`).join("");
+  p.querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = () =>
+    fetch("/api/sources/toggle",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({doc_id:cb.dataset.doc, enabled:cb.checked})}));
+};
+
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+</script>
+</body>
+</html>
