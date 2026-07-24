@@ -1,3 +1,14 @@
+---
+title: sourcebound
+emoji: 📚
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: 출처에만 근거해 답하고, 근거가 없으면 답하지 않는 육아 지식 AI
+---
+
 # sourcebound
 
 **검증된 출처에만 묶인(source-bound) 지식 AI.** 공공기관 자료를 근거로만 답하고,

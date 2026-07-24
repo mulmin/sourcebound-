@@ -36,9 +36,12 @@ _disabled, _citations = _load_state()
 
 
 def _save_state():
-    STATE_PATH.write_text(_json.dumps(
-        {"disabled": sorted(_disabled), "citations": _citations},
-        ensure_ascii=False, indent=1), encoding="utf-8")
+    try:
+        STATE_PATH.write_text(_json.dumps(
+            {"disabled": sorted(_disabled), "citations": _citations},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+    except Exception as e:   # 읽기전용/임시 파일시스템 호스팅에서도 계속 동작
+        print(f"[state] 저장 실패(무시): {e}", flush=True)
 
 
 def get_retriever() -> Retriever:
@@ -294,12 +297,17 @@ def feedback(req: FeedbackRequest):
     섞일 수 있으므로 로컬 파일에만 저장하고 외부로 보내지 않는다.
     """
     import datetime
-    path = ROOT / "data" / "feedback.jsonl"
     rec = {"ts": datetime.datetime.now().isoformat(timespec="seconds"),
            "question": req.question[:500], "answer": req.answer[:2000],
            "rating": req.rating, "comment": req.comment[:500], "mode": req.mode}
-    with path.open("a", encoding="utf-8") as f:
-        f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+    line = _json.dumps(rec, ensure_ascii=False)
+    try:
+        with (ROOT / "data" / "feedback.jsonl").open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception as e:                      # 읽기전용 호스팅에서도 서비스는 계속
+        print(f"[feedback] 파일 저장 실패: {e}", flush=True)
+    # 무료 호스팅은 재시작 시 파일이 초기화되므로 로그가 유일한 사본일 수 있다
+    print(f"[FEEDBACK] {line}", flush=True)
     return {"ok": True}
 
 
