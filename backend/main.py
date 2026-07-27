@@ -96,6 +96,17 @@ def ask(req: AskRequest):
                 "evidence": [], "verification": []}
 
     gen = generate(req.question, evidence, backend=r.backend)
+
+    # LLM이 '근거로 답할 수 없음'으로 판단(빈 문장 또는 상담권고만)하면 거부로 처리한다.
+    # 리랭커만으로는 인접 주제(다이어트·성인질환 등)와 실제 질문을 못 가르므로,
+    # 최종 answerability 판정은 근거를 실제로 읽은 LLM에 맡긴다.
+    grounded = [s for s in gen["sentences"] if s.get("citations")]
+    if not grounded:
+        return {"refused": True,
+                "answer": "검증된 자료에서 이 질문의 근거를 찾지 못했습니다. "
+                          "질문을 바꿔 보시거나 전문가와 상담하세요.",
+                "evidence": [], "verification": []}
+
     verification = verify(gen["sentences"], evidence, backend=r.backend)
     conflict = detect_source_conflict(evidence)
 
