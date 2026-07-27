@@ -70,14 +70,21 @@ class Retriever:
         pool = sorted(fused, key=lambda i: -fused[i])[:CANDIDATE_POOL]
 
         # 4) 리랭킹(가용 시) — 후보 풀을 교차 인코더로 재채점
+        import time
         rerank_scores: dict[int, float] = {}
+        rerank_s = 0.0
         if self.reranker.available:
             passages = [self.chunks[i]["text"] for i in pool]
-            for idx, sc in zip(pool, self.reranker.score(query, passages)):
+            _t = time.monotonic()
+            scored = self.reranker.score(query, passages)  # CPU에서 가장 비싼 단계
+            rerank_s = time.monotonic() - _t
+            for idx, sc in zip(pool, scored):
                 rerank_scores[idx] = sc
             order = sorted(pool, key=lambda i: -rerank_scores[i])[:k]
         else:
             order = pool[:k]
+        # 단계별 응답시간 진단용(리랭커가 몇 초/몇 쌍인지)
+        self.last_timing = {"rerank_s": rerank_s, "rerank_pairs": len(pool)}
 
         results = []
         for i in order:
