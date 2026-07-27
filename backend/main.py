@@ -6,12 +6,12 @@
 from __future__ import annotations
 import numpy as np
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from backend.config import ROOT, TOP_K
 from backend.retriever import Retriever
-from backend.generator import generate
+from backend.generator import generate, generate_stream
 from backend.verifier import verify, detect_source_conflict
 from backend.entailment import polarity, _split, _content_tokens
 from backend.licensing import lic_class, LABELS
@@ -139,6 +139,83 @@ def ask(req: AskRequest):
             "lic_class": lic_class(c["doc_meta"].get("license")),
         } for i, c in enumerate(evidence)],
     }
+
+
+def _evidence_payload(evidence: list[dict]) -> list[dict]:
+    """화면 표시용 근거 목록(번호·제목·유사도·라이선스 등)."""
+    return [{
+        "n": i + 1,
+        "chunk_id": c["chunk_id"],
+        "title": c["doc_meta"].get("title", c["doc_id"]),
+        "publisher": c["doc_meta"].get("publisher", ""),
+        "year": c["doc_meta"].get("year", ""),
+        "score": round(c["score"], 3),
+        "relevance": (round(c["rerank_score"], 3)
+                      if c.get("rerank_score") is not None else None),
+        "license": c["doc_meta"].get("license", ""),
+        "lic_class": lic_class(c["doc_meta"].get("license")),
+    } for i, c in enumerate(evidence)]
+
+
+def _sse(event: str, data) -> str:
+    """Server-Sent Events 한 프레임."""
+    return f"event: {event}\ndata: {_json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+_REFUSE_SEARCH = ("지식 팩에서 이 질문의 근거를 찾지 못했습니다. "
+                  "다른 질문을 해보시거나 전문가와 상담하세요.")
+_REFUSE_LLM = ("검증된 자료에서 이 질문의 근거를 찾지 못했습니다. "
+               "질문을 바꿔 보시거나 전문가와 상담하세요.")
+
+
+@app.post("/api/ask_stream")
+def ask_stream(req: AskRequest):
+    """스트리밍 응답(SSE): 답변 텍스트를 실시간으로 흘리고, 끝나면 검증·출처를 보낸다.
+
+    이벤트: status → delta(여러 번) → meta   /   또는 refused
+    총 처리 시간은 같지만, 빈 화면 대기 대신 글자가 흐르기 시작해 체감이 크게 빨라진다.
+    """
+    r = get_retriever()
+
+    def gen():
+        evidence = r.search(req.question, k=TOP_K, exclude=_disabled)
+        if r.is_refused(evidence):
+            yield _sse("refused", {"answer": _REFUSE_SEARCH})
+            return
+        yield _sse("status", {"stage": "answer"})
+        final = None
+        for ev in generate_stream(req.question, evidence, backend=r.backend):
+            if "delta" in ev:
+                yield _sse("delta", {"text": ev["delta"]})
+            elif ev.get("refused"):
+                yield _sse("refused", {"answer": _REFUSE_LLM})
+                return
+            elif "final" in ev:
+                final = ev["final"]
+        if not final:
+            yield _sse("refused", {"answer": _REFUSE_LLM})
+            return
+        verification = verify(final["sentences"], evidence, backend=r.backend)
+        conflict = detect_source_conflict(evidence)
+        counted = False
+        for v in verification:
+            for cnum in v["citations"]:
+                did = evidence[cnum - 1]["doc_id"]
+                _citations[did] = _citations.get(did, 0) + 1
+                counted = True
+        if counted:
+            _save_state()
+        yield _sse("meta", {
+            "mode": final["mode"], "answer": final["answer"],
+            "verification": verification, "conflict": conflict,
+            "evidence": _evidence_payload(evidence),
+        })
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",   # 프록시(nginx/Fly) 버퍼링 방지 → 실시간 전송
+        "Connection": "keep-alive",
+    })
 
 
 class ToggleRequest(BaseModel):

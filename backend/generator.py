@@ -47,6 +47,29 @@ CITATION_PROMPT = """당신은 육아 지식 도우미입니다. 부모에게 �
 {question}
 """
 
+# 스트리밍용: JSON 대신 '평문 + [n] 인용'을 흘려보내 토큰을 실시간 표시한다.
+# 끝나면 _structure_from_text 로 문장·인용을 복원한다(검증/배지용).
+STREAM_SENTINEL = "__NO_ANSWER__"
+CITATION_PROMPT_STREAM = """당신은 육아 지식 도우미입니다. 부모에게 이야기하듯 간결하고 자연스러운 상담체로 답하세요.
+아래 규칙을 반드시 지키세요.
+
+1. 오직 제공된 [근거]만 사용해 답하세요. 외부 지식·추측 금지.
+2. 각 문장 끝에 근거 번호를 대괄호로 답니다. 예: "…하는 것이 좋습니다.[1]" 여러 근거면 [1][2].
+3. 근거에 없거나, 질문이 영유아·육아와 무관하거나(성인 질환·반려동물·투자 등), 근거가 질문에
+   직접 답하지 않으면 아무 문장도 쓰지 말고 정확히 '__NO_ANSWER__' 한 줄만 출력하세요.
+4. "자료에 없다"처럼 자료 자체를 언급하는 메타 문장 금지. 질문에 직접 답하는 문장만.
+5. 질문과 주제가 다른 근거 문장은 넣지 마세요.
+6. 의학적 판단이 필요하면 마지막에 전문가 상담 권고를 번호 없이 덧붙이세요.
+7. 〔원문 그대로만 인용〕 표시가 붙은 근거는 원문 문장을 그대로 옮겨 인용하세요.
+
+[근거]
+{evidence}
+
+[질문]
+{question}
+
+답변:"""
+
 CITE_RE = re.compile(r"\[(\d+)\]")
 
 
@@ -232,19 +255,24 @@ def _extractive(question: str, evidence: list[dict], backend) -> list[dict]:
     return sentences
 
 
-def generate(question: str, evidence: list[dict], backend=None) -> dict:
-    """반환: {"mode", "sentences": [{"text","citations"}], "answer": str}
-
-    backend: 공유 EmbeddingBackend(추출 모드에서 재사용). None이면 새로 생성.
-    """
+def _numbered_evidence(evidence: list[dict]) -> str:
+    """근거를 '[n] (제목)〔라이선스〕 본문' 형태의 번호 목록 문자열로."""
     from backend.licensing import lic_class, allow_rewrite
-    numbered = "\n".join(
+    return "\n".join(
         f"[{i+1}] ({c['doc_meta'].get('title', c['doc_id'])})"
         + ("" if allow_rewrite(lic_class(c['doc_meta'].get('license')))
            else "〔원문 그대로만 인용〕")
         + f" {c['text']}"
         for i, c in enumerate(evidence)
     )
+
+
+def generate(question: str, evidence: list[dict], backend=None) -> dict:
+    """반환: {"mode", "sentences": [{"text","citations"}], "answer": str}
+
+    backend: 공유 EmbeddingBackend(추출 모드에서 재사용). None이면 새로 생성.
+    """
+    numbered = _numbered_evidence(evidence)
 
     sentences: list[dict] = []
     mode = "extractive"
@@ -268,3 +296,73 @@ def generate(question: str, evidence: list[dict], backend=None) -> dict:
         sentences.append({"text": ADVISORY, "citations": []})
 
     return {"mode": mode, "sentences": sentences, "answer": _render(sentences)}
+
+
+def generate_stream(question: str, evidence: list[dict], backend=None):
+    """스트리밍 생성기. 순서대로 yield한다:
+        {"delta": str}      — 답변 텍스트 조각(실시간 표시용)
+        {"refused": True}   — 근거로 답할 수 없음(빈 답변/무관 주제)
+        {"final": {...}}    — 스트리밍 종료 후 구조화 결과(검증·배지용)
+
+    OpenAI 스트리밍으로 '평문 + [n]'을 흘리고, 끝나면 문장·인용을 복원한다.
+    거부 신호(__NO_ANSWER__)가 화면에 노출되지 않도록 첫 조각은 서버에서 버퍼링한다.
+    키가 없거나 실패하면 비스트리밍 generate()로 폴백해 한 번에 전달한다."""
+    numbered = _numbered_evidence(evidence)
+
+    def _fallback():
+        g = generate(question, evidence, backend=backend)
+        if not any(s.get("citations") for s in g["sentences"]):
+            yield {"refused": True}
+            return
+        yield {"delta": g["answer"]}
+        yield {"final": g}
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        yield from _fallback()
+        return
+
+    prompt = CITATION_PROMPT_STREAM.format(evidence=numbered, question=question)
+    full, buf, flushing = "", "", False
+    try:
+        from openai import OpenAI
+        from backend.config import OPENAI_MODEL
+        stream = OpenAI().chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            stream=True,
+        )
+        for chunk in stream:
+            delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
+            if not delta:
+                continue
+            full += delta
+            if flushing:
+                yield {"delta": delta}
+                continue
+            buf += delta
+            if len(buf) >= len(STREAM_SENTINEL):     # 거부 신호인지 판별 가능한 만큼 모임
+                if buf.lstrip().startswith(STREAM_SENTINEL):
+                    yield {"refused": True}
+                    return
+                flushing = True
+                yield {"delta": buf}
+                buf = ""
+        if not flushing:                             # 아주 짧은 응답: 아직 안 비운 buf 처리
+            if buf.strip() and not buf.lstrip().startswith(STREAM_SENTINEL):
+                yield {"delta": buf}
+            else:
+                yield {"refused": True}
+                return
+    except Exception as e:
+        print(f"OpenAI 스트리밍 실패(폴백): {e}", flush=True)
+        yield from _fallback()
+        return
+
+    sentences = _structure_from_text(full, len(evidence))
+    if not any(s.get("citations") for s in sentences):
+        yield {"refused": True}
+        return
+    if not any("상담" in s["text"] for s in sentences):
+        sentences.append({"text": ADVISORY, "citations": []})
+    yield {"final": {"mode": "llm", "sentences": sentences,
+                     "answer": _render(sentences)}}
