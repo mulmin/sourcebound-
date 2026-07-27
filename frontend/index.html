@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1e3a8a">
-<title>육아 지식 AI — 출처를 확인하는 챗봇</title>
+<title>출처육아 — 문장마다 출처를 확인하는 육아 AI</title>
 <style>
   *{box-sizing:border-box;margin:0}
   :root{ --blue:#1e3a8a; --line:#e2e8f0; --mut:#64748b; }
@@ -13,7 +13,9 @@
        display:flex;flex-direction:column;overflow:hidden;-webkit-text-size-adjust:100%}
   header{background:var(--blue);color:#fff;padding:11px 16px;display:flex;align-items:center;gap:8px;flex:none}
   header b{font-size:16px}
-  header small{font-weight:normal;opacity:.75;font-size:11.5px}
+  header small{font-weight:normal;opacity:.8;font-size:11.5px;letter-spacing:.2px}
+  header b .accent{color:#fcd34d}
+  header b{letter-spacing:-.3px}
   header .sp{flex:1}
   .hbtn{background:#27408f;color:#fff;border:1px solid #3b5bb5;border-radius:8px;padding:5px 10px;
         font-size:12px;cursor:pointer;text-decoration:none}
@@ -26,11 +28,15 @@
           padding:10px 16px;display:flex;gap:8px;align-items:flex-start;flex:none;line-height:1.5}
   #notice button{margin-left:auto;background:none;border:none;color:#92400e;font-size:17px;cursor:pointer;padding:0 4px}
 
-  main{flex:1;display:flex;gap:14px;padding:14px;overflow:hidden;min-height:0}
+  main{flex:1;display:flex;gap:0;padding:14px;overflow:hidden;min-height:0}
   .panel{background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);
          display:flex;flex-direction:column;overflow:hidden;min-height:0}
-  #chat{flex:1.25}
-  #viewer{flex:1;border:1px solid #bbf7d0}
+  #chat{flex:0 0 var(--split,56%);min-width:0}
+  #viewer{flex:1 1 0;min-width:0;border:1px solid #bbf7d0}
+  /* 데스크톱: 채팅|원문 사이 드래그 분할선(비율 조절·확대) */
+  #divider{flex:0 0 14px;cursor:col-resize;position:relative;align-self:stretch;touch-action:none}
+  #divider::before{content:"";position:absolute;top:0;bottom:0;left:6px;width:3px;border-radius:3px;background:#cbd5e1;transition:background .15s}
+  #divider:hover::before,#divider.drag::before{background:#60a5fa}
   .panel h2{font-size:14.5px;padding:11px 16px;border-bottom:1px solid var(--line);color:#334155;flex:none;
             display:flex;align-items:center;gap:8px}
   #viewer h2{color:#15803d;border-color:#dcfce7}
@@ -53,7 +59,10 @@
   .contrabox{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b}
   .conflictbox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412}
   .sources{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font-size:12.5px}
-  .sources div{color:#1d4ed8;cursor:pointer;margin-top:5px;line-height:1.5}
+  .srcbtn{display:flex;align-items:center;gap:8px;color:#1d4ed8;cursor:pointer;margin-top:6px;line-height:1.5;
+          background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px}
+  .srcbtn:hover{background:#eef2ff;border-color:#93c5fd}
+  .srcbtn .go{margin-left:auto;color:#64748b;font-size:11.5px;white-space:nowrap;font-weight:bold}
   .licb{display:inline-block;font-size:10.5px;font-weight:bold;border-radius:5px;padding:1px 6px}
   .licb.open{background:#dcfce7;color:#15803d}
   .licb.nd{background:#fef3c7;color:#b45309}
@@ -86,9 +95,19 @@
 
   #viewer-body{flex:1;overflow-y:auto;padding:14px 16px;font-size:14px;line-height:1.8;color:#475569;white-space:pre-wrap}
   #viewer-meta{padding:9px 16px;background:#f0fdf4;font-size:12px;color:#166534;border-bottom:1px solid #dcfce7}
+  #viewer-actions{display:none;gap:8px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid #dcfce7}
+  #viewer-actions a{display:inline-flex;align-items:center;gap:5px;background:#eff6ff;border:1px solid #93c5fd;
+     color:#1d4ed8;border-radius:8px;padding:6px 12px;font-size:12.5px;text-decoration:none;cursor:pointer}
+  #viewer-actions a:hover{background:#dbeafe}
   mark{background:#fef9c3;padding:2px 0;border-radius:3px;font-weight:bold;color:#0f172a}
   .empty{color:#94a3b8;text-align:center;margin-top:40px;font-size:13px;padding:0 16px;line-height:1.6}
   .typing{display:inline-block;color:var(--mut);font-size:13.5px}
+  .spinner{display:inline-block;width:15px;height:15px;border:2.5px solid #dbeafe;border-top-color:var(--blue);
+           border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* 원문 시트 높이 조절 손잡이(모바일) */
+  #grip{display:none;flex:none;padding:9px 0 5px;cursor:ns-resize;touch-action:none}
+  #grip::before{content:"";display:block;width:44px;height:5px;margin:0 auto;border-radius:3px;background:#cbd5e1}
 
   /* 출처 관리(개발자) */
   #srcpanel{display:none;background:#fff;border-bottom:1px solid var(--line);max-height:40vh;overflow-y:auto;padding:12px 16px;flex:none}
@@ -104,30 +123,32 @@
     main{padding:0;gap:0}
     #chat{flex:1;border-radius:0;box-shadow:none}
     #chat>h2{display:none}
-    /* 하단 시트: transform 대신 display 토글(환경에 따라 transform이 무시되는 경우가 있어
-       동작이 확실한 방식을 쓴다). 슬라이드는 애니메이션으로 보완. */
-    #viewer{position:fixed;left:0;right:0;bottom:0;top:auto;height:72vh;z-index:50;
-            border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.25);display:none}
+    #divider{display:none}
+    /* 하단 시트: 높이를 --sheet 변수로 두어 손잡이 드래그로 확대/축소.
+       display 토글(환경에 따라 transform 무시 대비)에 슬라이드 애니메이션 보완. */
+    #viewer{position:fixed;left:0;right:0;bottom:0;top:auto;height:var(--sheet,58vh);z-index:50;
+            border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.28);display:none}
     #viewer.open{display:flex;animation:sheetUp .25s ease}
-    @keyframes sheetUp{from{margin-bottom:-72vh}to{margin-bottom:0}}
+    @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    #grip{display:block}
     #viewer-close{display:block}
     .msg-a,.msg-q{max-width:100%}
-    #backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40;display:none}
-    #backdrop.open{display:block}
+    /* 답변↔원문 대조가 가능하도록 채팅을 어둡게 덮지 않는다(모달→분할 느낌) */
+    #backdrop{display:none !important}
   }
 </style>
 </head>
 <body>
 <header>
-  <b>육아 지식 AI</b><small>모든 답변에 출처와 근거를 표시합니다</small>
+  <b><span class="accent">출처</span>육아</b><small>문장마다 출처를, 근거 없으면 침묵을</small>
   <span class="sp"></span>
   <button class="hbtn devonly" id="btn-src">출처 관리</button>
   <a class="hbtn devonly" href="/graph">지식 그래프</a>
 </header>
 
 <div id="notice">
-  <span>⚠️ <b>참고용 정보입니다.</b> 공공기관 자료를 근거로 답하지만 진료를 대신할 수 없습니다.
-    아이 상태가 걱정되면 소아청소년과 전문의와 상담하세요. 응급 시 119.</span>
+  <span>⚠️ 본 답변은 공공기관 자료에 근거한 <b>참고용 정보</b>로, 의학적 진단·처방을 대신하지 않습니다.
+    아이의 증상이 심하거나 지속되면 소아청소년과 전문의와 상담하시고, 응급 상황에는 즉시 <b>119</b>에 연락하세요.</span>
   <button id="notice-x" aria-label="닫기">×</button>
 </div>
 
@@ -135,17 +156,20 @@
 
 <main>
   <section id="chat" class="panel">
-    <h2>육아 AI 챗봇</h2>
+    <h2>출처육아 챗봇</h2>
     <div id="messages"></div>
     <form id="form">
       <input id="q" placeholder="육아 고민을 입력하세요…" autocomplete="off" enterkeyhint="send">
       <button id="send">질문</button>
     </form>
   </section>
+  <div id="divider" title="드래그해서 원문을 넓게 보기"></div>
   <section id="viewer" class="panel">
+    <div id="grip" title="드래그해서 높이 조절"></div>
     <h2>원문 확인 <button id="viewer-close" aria-label="닫기">×</button></h2>
     <div id="viewer-meta" style="display:none"></div>
-    <div id="viewer-body"><div class="empty">답변의 인용 번호 <b>[n]</b> 을 누르면<br>원문에서 해당 구절을 보여줍니다.</div></div>
+    <div id="viewer-actions"></div>
+    <div id="viewer-body"><div class="empty">답변의 인용 번호 <b>[n]</b> 이나 <b>출처</b>를 누르면<br>원문에서 해당 구절을 보여줍니다.</div></div>
   </section>
 </main>
 <div id="backdrop"></div>
@@ -190,7 +214,7 @@ form.addEventListener("submit", async e => {
                  "📖 근거를 읽고 답변을 정리하는 중…",
                  "✅ 출처와 일치하는지 검증하는 중…"];
   let si = 0;
-  const paint = () => thinking.innerHTML = `<span class="typing">${steps[si]}</span>`;
+  const paint = () => thinking.innerHTML = `<span class="typing"><span class="spinner"></span>${steps[si]}</span>`;
   paint();
   const timer = setInterval(() => { si = Math.min(si + 1, steps.length - 1); paint(); }, 5000);
   sendBtn.disabled = true;
@@ -248,9 +272,9 @@ function renderAnswer(data, question) {
   if (lows.length) html += `<div class="warnbox">⚠ 근거가 약한 문장이 ${lows.length}개 있습니다.</div>`;
   if (uncited.length) html += `<div class="warnbox">⚠ 출처가 표시되지 않은 문장이 ${uncited.length}개 있습니다.</div>`;
   if (data.conflict) html += `<div class="conflictbox">⚖ 출처 [${data.conflict.between[0]}]와 [${data.conflict.between[1]}]의 내용이 다릅니다. 양쪽 원문을 비교해 보세요.</div>`;
-  html += `<div class="sources"><b>출처</b>` + data.evidence.map(ev=>{
+  html += `<div class="sources"><b>출처 · 원문 전체보기</b>` + data.evidence.map(ev=>{
     const lic = ev.lic_class ? ` <span class="licb ${ev.lic_class}">${LIC_LABEL[ev.lic_class]||""}</span>` : "";
-    return `<div data-chunk="${ev.chunk_id}">[${ev.n}] ${esc(ev.title)}${lic}</div>`;
+    return `<div class="srcbtn" data-chunk="${ev.chunk_id}"><span>[${ev.n}] ${esc(ev.title)}${lic}</span><span class="go">원문 전체보기 ›</span></div>`;
   }).join("") + `</div>`;
   div.innerHTML = html;
   div.querySelectorAll("[data-chunk]").forEach(el => el.onclick = () => openSource(el.dataset.chunk));
@@ -288,14 +312,65 @@ async function openSource(chunkId) {
   const meta = $("#viewer-meta");
   meta.style.display = "block";
   meta.textContent = `${d.meta.title||""} · ${d.meta.publisher||""}`;
+  // 실제 공공기관 원문 사이트 링크(있을 때만) — 'AI가 지어낸 게 아니다'를 증명
+  const actions = $("#viewer-actions");
+  actions.innerHTML = "";
+  const url = d.meta.url || "";
+  if (/^https?:\/\//.test(url)) {
+    const a = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.textContent = "🔗 공공기관 원문 사이트 열기 ↗";
+    actions.appendChild(a); actions.style.display = "flex";
+  } else actions.style.display = "none";
   const body = $("#viewer-body"), {start,end} = d.highlight, t = d.body;
   body.innerHTML = esc(t.slice(0,start)) + "<mark>" + esc(t.slice(start,end)) + "</mark>" + esc(t.slice(end));
   viewer.classList.add("open"); backdrop.classList.add("open");
   const m = body.querySelector("mark");
   if (m) m.scrollIntoView({behavior:"smooth", block:"center"});
 }
-const closeViewer = () => { viewer.classList.remove("open"); backdrop.classList.remove("open"); };
+const closeViewer = () => { viewer.classList.remove("open"); backdrop.classList.remove("open");
+  document.documentElement.style.removeProperty("--sheet"); };
 $("#viewer-close").onclick = closeViewer; backdrop.onclick = closeViewer;
+
+// ── 화면 비율 조절(검증 대조용): 데스크톱 분할선 + 모바일 시트 손잡이 ──
+const root = document.documentElement;
+const isMobile = () => matchMedia("(max-width:760px)").matches;
+
+// 데스크톱: 채팅|원문 좌우 비율을 드래그로 조절(원문 확대)
+const divider = $("#divider");
+divider.addEventListener("pointerdown", e => {
+  if (isMobile()) return;
+  e.preventDefault(); divider.classList.add("drag");
+  divider.setPointerCapture(e.pointerId);
+  const rect = $("main").getBoundingClientRect();
+  const move = ev => {
+    let pct = (ev.clientX - rect.left) / rect.width * 100;
+    root.style.setProperty("--split", Math.max(28, Math.min(78, pct)) + "%");
+  };
+  const up = () => { divider.classList.remove("drag");
+    divider.removeEventListener("pointermove", move);
+    divider.removeEventListener("pointerup", up); };
+  divider.addEventListener("pointermove", move);
+  divider.addEventListener("pointerup", up);
+});
+
+// 모바일: 원문 시트 높이를 드래그로 확대/축소, 많이 내리면 닫힘
+const grip = $("#grip");
+grip.addEventListener("pointerdown", e => {
+  e.preventDefault(); grip.setPointerCapture(e.pointerId);
+  const move = ev => {
+    const h = (window.innerHeight - ev.clientY) / window.innerHeight * 100;
+    root.style.setProperty("--sheet", Math.max(20, Math.min(95, h)) + "vh");
+  };
+  const up = ev => {
+    const h = (window.innerHeight - ev.clientY) / window.innerHeight * 100;
+    if (h < 24) closeViewer();     // 아래로 끌어내리면 닫기
+    grip.removeEventListener("pointermove", move);
+    grip.removeEventListener("pointerup", up);
+  };
+  grip.addEventListener("pointermove", move);
+  grip.addEventListener("pointerup", up);
+});
 
 // 출처 관리(개발자 전용)
 $("#btn-src").onclick = async () => {
