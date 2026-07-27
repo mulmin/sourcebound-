@@ -44,26 +44,34 @@ def _save_state():
         print(f"[state] 저장 실패(무시): {e}", flush=True)
 
 
+import threading
+_retriever_lock = threading.Lock()
+
+
 def get_retriever() -> Retriever:
     global _retriever
     if _retriever is None:
-        _retriever = Retriever()
+        with _retriever_lock:        # 워밍업 스레드와 첫 요청이 모델을 이중 로딩(=이중 메모리)하지 않도록
+            if _retriever is None:
+                _retriever = Retriever()
     return _retriever
 
 
 @app.on_event("startup")
 def _warmup():
-    """서버 기동 시 모델을 미리 로드·예열한다.
+    """모델을 백그라운드에서 미리 로드한다.
 
-    첫 질문에서 임베딩·리랭커 로딩(~30초)을 사용자가 그대로 맞지 않도록 한다.
-    실패해도 서비스는 계속 뜬다(첫 요청 때 지연될 뿐).
+    로딩(~수십 초)이 startup을 막으면 그동안 포트가 안 열려 Fly 프록시가
+    'connection refused'를 낸다(특히 auto-stop 후 깨어날 때). 그래서 스레드로
+    분리해 포트를 즉시 열고, 모델은 뒤에서 예열한다. 첫 질문은 로딩이 끝날 때까지만 기다린다.
     """
-    try:
-        r = get_retriever()
-        r.search("예열", k=1)          # 실제 경로를 한 번 통과시켜 캐시 예열
-        print("[warmup] 모델 로딩 완료")
-    except Exception as e:
-        print(f"[warmup] 건너뜀: {e}")
+    def run():
+        try:
+            get_retriever().search("예열", k=1)
+            print("[warmup] 모델 로딩 완료", flush=True)
+        except Exception as e:
+            print(f"[warmup] 실패: {e}", flush=True)
+    threading.Thread(target=run, daemon=True).start()
 
 
 class AskRequest(BaseModel):

@@ -1,21 +1,24 @@
-# fly.toml app configuration file generated for sourcebound on 2026-07-27T12:50:21+09:00
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
+# Fly.io 배포 설정 — sourcebound
 app = 'sourcebound'
-primary_region = 'nrt'
+primary_region = 'nrt'          # 도쿄 (한국에서 가장 가까움)
 
 [build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  # 리랭커는 CPU에서 비싼 단계 — 후보를 줄여 응답 시간을 지킨다.
+  MPA_CANDIDATE_POOL = '5'
+
 [http_service]
   internal_port = 7860
   force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
+  auto_stop_machines = 'stop'   # 미사용 시 자동 정지(정지 중 과금 최소)
+  auto_start_machines = true    # 접속 오면 자동 기동
   min_machines_running = 0
   processes = ['app']
 
 [[vm]]
-  memory = '2gb'
+  # 리랭커 safetensors 2.3GB mmap + e5 + 추론 여유. 2·4GB는 OOM 확인됨 → 8GB.
+  cpu_kind = 'shared'
   cpus = 4
-  memory_mb = 2048
+  memory_mb = 8192
