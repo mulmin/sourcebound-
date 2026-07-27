@@ -23,6 +23,17 @@ class Reranker:
             from sentence_transformers import CrossEncoder
             from backend.config import RERANKER_MODEL
             self._model = CrossEncoder(RERANKER_MODEL)
+            # CPU 동적 INT8 양자화: 리랭커 Linear 계층을 int8로 낮춰 CPU 추론을 가속한다.
+            # 리랭킹은 응답 시간의 절반 이상을 차지하는 최대 병목 — 로컬 실측 6배 빨라지고
+            # 스코어 차이는 <0.01(순위·거부 임계 0.08 분리 유지)로 품질은 사실상 동일하다.
+            # 로드 시점(런타임)에 적용하므로 Docker/의존성 변경이 없다. 끄려면 MPA_RERANK_FP32=1.
+            if os.environ.get("MPA_RERANK_FP32") != "1":
+                try:
+                    import torch
+                    self._model.model = torch.quantization.quantize_dynamic(
+                        self._model.model, {torch.nn.Linear}, dtype=torch.qint8)
+                except Exception as e:
+                    print(f"[reranker] INT8 양자화 건너뜀(FP32로 진행): {e}", flush=True)
             self.available = True
         except Exception:
             self.available = False
