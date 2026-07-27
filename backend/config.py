@@ -33,7 +33,7 @@ TOP_K = 4                 # 최종 근거 청크 수(리랭킹 후)
 # 리랭킹 전 1차 후보 수. 리랭커(교차 인코더)는 CPU에서 쌍당 ~1.6초로 가장 비싼 단계라
 # 이 값이 곧 응답 시간이다(20개=32초). 하이브리드(BM25+dense) 순위가 이미 정확해
 # 상위 6개만 재채점해도 품질이 유지된다 — 실측으로 확인 후 조정할 것.
-CANDIDATE_POOL = int(os.environ.get("MPA_CANDIDATE_POOL", "6"))
+CANDIDATE_POOL = int(os.environ.get("MPA_CANDIDATE_POOL", "4"))
 RRF_K = 60                # RRF(순위 융합) 상수
 SIM_WARN_THRESHOLD = 0.45 # 답변-근거 유사도가 이 미만이면 "근거 약함" 경고
 

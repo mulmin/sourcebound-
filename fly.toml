@@ -6,8 +6,9 @@ primary_region = 'nrt'          # 도쿄 (한국에서 가장 가까움)
   dockerfile = 'Dockerfile'
 
 [env]
-  # 리랭커는 CPU에서 비싼 단계 — 후보를 줄여 응답 시간을 지킨다.
-  MPA_CANDIDATE_POOL = '5'
+  # 리랭커는 CPU에서 비싼 단계(응답의 절반 이상) — 후보 수가 곧 리랭킹 시간이다.
+  # TOP_K=4가 하한(최종 근거 4개)이라 4로 낮춰 리랭킹 쌍을 20% 줄인다.
+  MPA_CANDIDATE_POOL = '4'
 
 [http_service]
   internal_port = 7860
