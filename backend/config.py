@@ -41,11 +41,13 @@ SIM_WARN_THRESHOLD = 0.45 # 답변-근거 유사도가 이 미만이면 "근거 
 # 리랭커가 있으면 리랭커 점수로 판정(가장 calibrated), 없으면 dense+BM25 동반 신호.
 SIM_REJECT_THRESHOLD = {"sbert": 0.30, "tfidf": 0.06}  # dense 최고 유사도 하한
 BM25_REJECT_THRESHOLD = 0.0   # BM25 최고 점수가 이 이하이면 '어휘적 근거 없음'
-# 리랭커 관련성 점수(bge-reranker는 sigmoid로 [0,1])가 이 미만이면 즉시 거부.
-# 코퍼스에 인접 의학·영양 내용이 있어 리랭커 점수가 정상/OOD를 깨끗이 못 가른다
-# (예: "다이어트" 0.86 > "돌 전 꿀" 0.02). 그래서 리랭커는 '명백한 쓰레기'만 싸게 거르고
-# (비트코인·엔진오일 ~0.001), 나머지 진짜 판단은 생성 LLM의 근거-답변 정합성에 맡긴다.
-RERANKER_REJECT_THRESHOLD = 0.01
+# 리랭커 관련성 점수(bge-reranker는 sigmoid로 [0,1])가 이 미만이면 즉시(LLM 호출 전) 거부.
+# 2026-07 실측 재보정: 정상 질문 최저 top_rel=0.365(밤에 깨요), 경계 0.185(수족구 "언제 보내도"),
+# 누수 OOD "다이어트 식단" 0.030 → 0.03과 0.185 사이가 비어 깨끗한 간격이 생겼다.
+# (과거엔 리랭커 OOM으로 "돌 전 꿀"이 0.02까지 떨어져 임계를 못 올렸으나, 정상화 후 0.663으로 회복.)
+# 0.08로 잡으면 다이어트 누수는 막고 경계·정상 질문은 살린다(누수 대비 2.6배, 경계 대비 2.3배 여유).
+# LLM 근거-답변 정합성 게이트(main.ask)는 2차 방어로 유지.
+RERANKER_REJECT_THRESHOLD = 0.08
 
 # 임베딩 모델 (sentence-transformers 설치 시 사용, 미설치 시 TF-IDF 폴백)
 EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
