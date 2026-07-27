@@ -1,25 +1,20 @@
-# Hugging Face Spaces (Docker SDK) 배포용
-# - HF Spaces는 컨테이너의 7860 포트를 노출한다.
-# - 모델 캐시는 쓰기 가능한 경로여야 하므로 /tmp 아래로 지정한다.
+# Fly.io / 컨테이너 배포용 — sourcebound
 FROM python:3.11-slim
 
-# torch/tokenizers 빌드에 필요한 최소 도구
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 모델·데이터 캐시 위치 (HF Spaces에서 쓰기 가능한 경로)
-ENV HF_HOME=/tmp/hf \
-    TRANSFORMERS_CACHE=/tmp/hf \
-    SENTENCE_TRANSFORMERS_HOME=/tmp/hf \
+# 모델 캐시를 이미지에 구워넣는다(빌드 시 다운로드 → 재기동 때 재다운로드 없음).
+# auto-stop으로 서버가 잠들었다 깨어나도 모델이 이미 이미지에 있어 바로 로딩된다.
+ENV HF_HOME=/opt/hf \
     HF_HUB_DISABLE_SYMLINKS_WARNING=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=utf-8
+    PYTHONIOENCODING=utf-8 \
+    TOKENIZERS_PARALLELISM=false
 
-# 의존성 먼저 설치(레이어 캐시 활용)
-COPY requirements.txt .
-# torch는 CPU 전용 휠로 설치해 이미지 용량을 줄인다.
+# 1) 의존성 (CPU 전용 torch로 이미지 경량화)
 RUN pip install --no-cache-dir torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir \
       "numpy>=1.24,<2" fastapi uvicorn "scikit-learn>=1.3" \
@@ -28,7 +23,10 @@ RUN pip install --no-cache-dir torch==2.2.2 --index-url https://download.pytorch
       "tokenizers<0.20" "huggingface_hub<0.25" \
       openai pymupdf
 
-# 애플리케이션 코드 + 인덱스(원본 PDF는 저장소에 없음 — 인덱스만으로 동작)
+# 2) 임베딩·리랭커 모델을 빌드 단계에서 미리 받아 이미지에 포함(재기동 시 재다운로드 없음)
+RUN python -c "from sentence_transformers import SentenceTransformer, CrossEncoder; SentenceTransformer('intfloat/multilingual-e5-small'); CrossEncoder('BAAI/bge-reranker-v2-m3'); print('models cached')"
+
+# 3) 애플리케이션 코드 + 인덱스 (원본 PDF는 .dockerignore로 제외)
 COPY . .
 
 EXPOSE 7860

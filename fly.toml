@@ -1,0 +1,21 @@
+# fly.toml app configuration file generated for sourcebound on 2026-07-27T12:50:21+09:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'sourcebound'
+primary_region = 'nrt'
+
+[build]
+[http_service]
+  internal_port = 7860
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '2gb'
+  cpus = 4
+  memory_mb = 2048
