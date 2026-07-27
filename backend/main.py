@@ -85,30 +85,44 @@ def index():
 
 @app.post("/api/ask")
 def ask(req: AskRequest):
+    import time
     r = get_retriever()
+    _t = time.monotonic()
     evidence = r.search(req.question, k=TOP_K, exclude=_disabled)
+    t_search = time.monotonic() - _t
+    rr = getattr(r, "last_timing", {})
+    _rk = f"rerank={rr.get('rerank_s', 0):.2f}s({rr.get('rerank_pairs', 0)}쌍)"
 
     # 답변 거부: 하이브리드 검색 신호(리랭커 또는 dense+BM25)로 근거 유무 판단
     if r.is_refused(evidence):
+        print(f"[TIMING] search={t_search:.2f}s {_rk} llm=- verify=- → 거부(검색)", flush=True)
         return {"refused": True,
                 "answer": "지식 팩에서 이 질문의 근거를 찾지 못했습니다. "
                           "다른 질문을 해보시거나 전문가와 상담하세요.",
                 "evidence": [], "verification": []}
 
+    _t = time.monotonic()
     gen = generate(req.question, evidence, backend=r.backend)
+    t_gen = time.monotonic() - _t
 
     # LLM이 '근거로 답할 수 없음'으로 판단(빈 문장 또는 상담권고만)하면 거부로 처리한다.
     # 리랭커만으로는 인접 주제(다이어트·성인질환 등)와 실제 질문을 못 가르므로,
     # 최종 answerability 판정은 근거를 실제로 읽은 LLM에 맡긴다.
     grounded = [s for s in gen["sentences"] if s.get("citations")]
     if not grounded:
+        print(f"[TIMING] search={t_search:.2f}s {_rk} llm={t_gen:.2f}s verify=- → 거부(LLM)", flush=True)
         return {"refused": True,
                 "answer": "검증된 자료에서 이 질문의 근거를 찾지 못했습니다. "
                           "질문을 바꿔 보시거나 전문가와 상담하세요.",
                 "evidence": [], "verification": []}
 
+    _t = time.monotonic()
     verification = verify(gen["sentences"], evidence, backend=r.backend)
+    t_ver = time.monotonic() - _t
     conflict = detect_source_conflict(evidence)
+    total = t_search + t_gen + t_ver
+    print(f"[TIMING] search={t_search:.2f}s {_rk} llm={t_gen:.2f}s "
+          f"verify={t_ver:.2f}s total≈{total:.2f}s → 답변", flush=True)
 
     # 출처별 인용 기여도 집계(문장 인용 1건 = 1카운트) — 수익분배 지표의 원천
     counted = False
