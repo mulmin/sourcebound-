@@ -105,6 +105,9 @@
   .spinner{display:inline-block;width:15px;height:15px;border:2.5px solid #dbeafe;border-top-color:var(--blue);
            border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px;margin-right:8px}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .msg-a.streaming{white-space:pre-wrap}
+  .msg-a.streaming::after{content:"▋";color:var(--blue);animation:blink 1s steps(1) infinite;margin-left:1px}
+  @keyframes blink{50%{opacity:0}}
   /* 원문 시트 높이 조절 손잡이(모바일) */
   #grip{display:none;flex:none;padding:9px 0 5px;cursor:ns-resize;touch-action:none}
   #grip::before{content:"";display:block;width:44px;height:5px;margin:0 auto;border-radius:3px;background:#cbd5e1}
@@ -201,6 +204,16 @@ function showWelcome() {
 }
 showWelcome();
 
+function parseSSE(frame) {
+  let event = "message", data = "";
+  frame.split("\n").forEach(line => {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  });
+  try { return {event, data: data ? JSON.parse(data) : null}; }
+  catch { return {event, data: null}; }
+}
+
 form.addEventListener("submit", async e => {
   e.preventDefault();
   const question = input.value.trim();
@@ -208,28 +221,48 @@ form.addEventListener("submit", async e => {
   input.value = ""; input.blur();
   if (messages.querySelector(".welcome")) messages.innerHTML = "";
   addBubble("msg-q", question);
-  const thinking = addBubble("msg-a", "");
-  // 응답에 10초 이상 걸리므로 단계별 안내로 '멈춘 느낌'을 없앤다
-  const steps = ["🔎 공공기관 자료에서 근거를 찾는 중…",
-                 "📖 근거를 읽고 답변을 정리하는 중…",
-                 "✅ 출처와 일치하는지 검증하는 중…"];
-  let si = 0;
-  const paint = () => thinking.innerHTML = `<span class="typing"><span class="spinner"></span>${steps[si]}</span>`;
-  paint();
-  const timer = setInterval(() => { si = Math.min(si + 1, steps.length - 1); paint(); }, 5000);
+  const bubble = addBubble("msg-a", "");
+  // 검색·리랭킹 동안 스피너 안내 → delta가 오면 글자를 실시간으로 흘린다(체감 속도)
+  bubble.innerHTML = `<span class="typing"><span class="spinner"></span>🔎 공공기관 자료에서 근거를 찾는 중…</span>`;
   sendBtn.disabled = true;
+  let streaming = false, streamed = "";
   try {
-    const res = await fetch("/api/ask", {method:"POST",
+    const res = await fetch("/api/ask_stream", {method:"POST",
       headers:{"Content-Type":"application/json"}, body: JSON.stringify({question})});
-    if (!res.ok) throw new Error("서버 오류 " + res.status);
-    const data = await res.json();
-    thinking.remove();
-    renderAnswer(data, question);
+    if (!res.ok || !res.body) throw new Error("서버 오류 " + res.status);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "", finished = false;
+    while (!finished) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const {event, data} = parseSSE(buf.slice(0, i));
+        buf = buf.slice(i + 2);
+        if (event === "status") {
+          bubble.innerHTML = `<span class="typing"><span class="spinner"></span>📖 근거를 읽고 답변을 정리하는 중…</span>`;
+        } else if (event === "delta") {
+          if (!streaming) { streaming = true; bubble.innerHTML = ""; bubble.classList.add("streaming"); }
+          streamed += (data && data.text) || "";
+          bubble.textContent = streamed;          // 평문 스트림(인용 배지는 meta에서 최종 렌더)
+          messages.scrollTop = messages.scrollHeight;
+        } else if (event === "refused") {
+          bubble.classList.remove("streaming");
+          fillAnswer(bubble, {refused:true}, question);
+          finished = true;
+        } else if (event === "meta") {
+          bubble.classList.remove("streaming");
+          fillAnswer(bubble, data, question);     // 배지·유사도·출처·피드백으로 교체
+          finished = true;
+        }
+      }
+    }
   } catch (err) {
-    thinking.innerHTML = `<span style="color:#b91c1c">답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.</span>
+    bubble.classList.remove("streaming");
+    bubble.innerHTML = `<span style="color:#b91c1c">답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.</span>
       <div style="color:#94a3b8;font-size:12px;margin-top:4px">${esc(String(err.message||err))}</div>`;
   } finally {
-    clearInterval(timer);
     sendBtn.disabled = false;
   }
 });
@@ -241,13 +274,12 @@ function addBubble(cls, text) {
   return d;
 }
 
-function renderAnswer(data, question) {
-  const div = document.createElement("div");
+function fillAnswer(div, data, question) {
   div.className = "msg-a" + (data.refused ? " refused" : "");
   if (data.refused) {
     div.innerHTML = `<b>🔒 검증된 자료에서 근거를 찾지 못했습니다.</b><br>
       정확하지 않은 정보를 드리지 않기 위해 답하지 않습니다. 질문을 바꿔 보시거나 전문가와 상담하세요.`;
-    messages.appendChild(div); messages.scrollTop = messages.scrollHeight; return;
+    messages.scrollTop = messages.scrollHeight; return;
   }
   const vs = data.verification || [];
   let html = "";
@@ -279,7 +311,7 @@ function renderAnswer(data, question) {
   div.innerHTML = html;
   div.querySelectorAll("[data-chunk]").forEach(el => el.onclick = () => openSource(el.dataset.chunk));
   div.appendChild(makeFeedback(question, data));
-  messages.appendChild(div); messages.scrollTop = messages.scrollHeight;
+  messages.scrollTop = messages.scrollHeight;
 }
 
 function makeFeedback(question, data) {
