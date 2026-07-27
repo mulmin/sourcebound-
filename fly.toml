@@ -19,7 +19,8 @@ primary_region = 'nrt'          # 도쿄 (한국에서 가장 가까움)
   processes = ['app']
 
 [[vm]]
-  # 리랭커 safetensors 2.3GB mmap + e5 + 추론 여유. 2·4GB는 OOM 확인됨 → 8GB.
-  cpu_kind = 'shared'
-  cpus = 4
+  # 공유 CPU는 리랭커에서 스로틀링(30~100초, 편차 큼) → 전용 CPU로 전환.
+  # 전용 2코어면 로컬 수준(~14초, 일정). auto-stop/suspend로 유휴 시 과금 최소화가 전제.
+  cpu_kind = 'performance'
+  cpus = 2
   memory_mb = 8192
