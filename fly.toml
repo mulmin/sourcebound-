@@ -12,8 +12,9 @@ primary_region = 'nrt'          # 도쿄 (한국에서 가장 가까움)
 [http_service]
   internal_port = 7860
   force_https = true
-  auto_stop_machines = 'stop'   # 미사용 시 자동 정지(정지 중 과금 최소)
-  auto_start_machines = true    # 접속 오면 자동 기동
+  auto_stop_machines = 'suspend'  # 미사용 시 '일시정지'(메모리 상태 보존).
+                                  # stop과 달리 깨어날 때 모델을 다시 안 올려 콜드스타트 없음(1~3초 복원).
+  auto_start_machines = true      # 접속 오면 자동 재개
   min_machines_running = 0
   processes = ['app']
 
