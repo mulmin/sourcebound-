@@ -94,9 +94,39 @@ class Retriever:
             "dense_top": max(float(dense[i]) for i in allowed),
             "bm25_top": max(float(bm25[i]) for i in allowed),
             "rerank_top": max(rerank_scores.values()) if rerank_scores else None,
+            "rerank_pool": list(rerank_scores.values()),   # 상대 임계용 후보 점수 분포
             "reranker_used": self.reranker.available,
         }
         return results
+
+    @staticmethod
+    def _reranker_refuses(top: float, pool: list[float]) -> bool:
+        """상대(적응) 거부 판정 — 고정 임계 대신 후보 점수 분포를 본다.
+
+        리랭커 sigmoid 점수는 질문 표현에 따라 절대값이 크게 흔들려 고정 컷이
+        '맥락상 관련 있는데 점수만 낮은' 질문을 오거부한다. 대신 3단으로:
+          top ≥ ANSWER_FLOOR : 명확히 관련 → 응답
+          top < HARD_FLOOR   : 명백 무관 → 거부
+          그 사이            : 최상위가 나머지 후보에서 '뚜렷이 돌출'하면(구별되는
+            근거가 있으면) LLM 게이트에 실제 내용 판정을 맡기고(거부 안 함),
+            분포가 평평하면(구별되는 근거 없음) 거부.
+        """
+        from backend.config import (
+            RERANKER_ANSWER_FLOOR, RERANKER_HARD_FLOOR,
+            RERANKER_STANDOUT_RATIO, RERANKER_STANDOUT_GAP,
+        )
+        if top >= RERANKER_ANSWER_FLOOR:
+            return False
+        if top < RERANKER_HARD_FLOOR:
+            return True
+        others = sorted(pool, reverse=True)[1:]
+        if not others:                       # 후보가 top 하나뿐이면 LLM에 맡긴다
+            return False
+        import statistics
+        med = statistics.median(others)
+        stands_out = (top >= med * RERANKER_STANDOUT_RATIO
+                      or (top - med) >= RERANKER_STANDOUT_GAP)
+        return not stands_out
 
     def is_refused(self, results: list[dict]) -> bool:
         """검색 신호로 '근거 없음' 판정.
@@ -108,14 +138,14 @@ class Retriever:
              → BM25(내용어 기반)가 가용하면 BM25만으로 판정, 없으면 약한 폴백.
         """
         from backend.config import (
-            SIM_REJECT_THRESHOLD, BM25_REJECT_THRESHOLD, RERANKER_REJECT_THRESHOLD,
+            SIM_REJECT_THRESHOLD, BM25_REJECT_THRESHOLD,
         )
         if not results:
             return True
         sig = self.last_signals
-        # 1) 리랭커(교차 인코더)가 가장 신뢰할 만한 관련성 신호
+        # 1) 리랭커(교차 인코더)가 가장 신뢰할 만한 관련성 신호 — 상대(적응) 판정
         if sig.get("rerank_top") is not None:
-            return sig["rerank_top"] < RERANKER_REJECT_THRESHOLD
+            return self._reranker_refuses(sig["rerank_top"], sig.get("rerank_pool", []))
         # 2) BM25(내용어)는 임베딩 종류와 무관하게 OOD에 0을 주어 변별력이 좋다.
         #    (e5 dense는 무관 텍스트에도 ~0.79를 줘 절대값으로 OOD를 가르기 어렵다)
         if self.bm25.available:

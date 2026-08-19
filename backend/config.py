@@ -41,13 +41,20 @@ SIM_WARN_THRESHOLD = 0.45 # 답변-근거 유사도가 이 미만이면 "근거 
 # 리랭커가 있으면 리랭커 점수로 판정(가장 calibrated), 없으면 dense+BM25 동반 신호.
 SIM_REJECT_THRESHOLD = {"sbert": 0.30, "tfidf": 0.06}  # dense 최고 유사도 하한
 BM25_REJECT_THRESHOLD = 0.0   # BM25 최고 점수가 이 이하이면 '어휘적 근거 없음'
-# 리랭커 관련성 점수(bge-reranker는 sigmoid로 [0,1])가 이 미만이면 즉시(LLM 호출 전) 거부.
-# 2026-07 실측 재보정: 정상 질문 최저 top_rel=0.365(밤에 깨요), 경계 0.185(수족구 "언제 보내도"),
-# 누수 OOD "다이어트 식단" 0.030 → 0.03과 0.185 사이가 비어 깨끗한 간격이 생겼다.
-# (과거엔 리랭커 OOM으로 "돌 전 꿀"이 0.02까지 떨어져 임계를 못 올렸으나, 정상화 후 0.663으로 회복.)
-# 0.08로 잡으면 다이어트 누수는 막고 경계·정상 질문은 살린다(누수 대비 2.6배, 경계 대비 2.3배 여유).
-# LLM 근거-답변 정합성 게이트(main.ask)는 2차 방어로 유지.
-RERANKER_REJECT_THRESHOLD = 0.08
+# 리랭커 거부: 고정 임계 대신 '후보 분포 기반 상대(적응) 판정'(retriever._reranker_refuses).
+# 이유: bge-reranker의 sigmoid 점수는 질문 표현에 따라 절대값이 크게 흔들려(같은 의도가
+# 0.18~0.96) 고정 컷은 '맥락상 관련 있는데 점수만 낮은' 질문을 오거부한다. 그래서:
+#   top ≥ ANSWER_FLOOR   → 명확히 관련, 응답
+#   top < HARD_FLOOR     → 명백 무관(비트코인 등), 즉시 거부
+#   그 사이              → 최상위가 나머지 후보에서 '뚜렷이 돌출'하면(구별되는 근거가 있으면)
+#                          LLM answerability 게이트로 넘겨 실제 내용으로 판정(여기서 거부 안 함),
+#                          분포가 평평하면(구별되는 근거 없음) 거부.
+# 최종 answerability는 근거를 읽는 LLM 게이트(main.ask)가 맡는다. '앞은 회수율로 열고 끝은 정밀도로 조인다'.
+RERANKER_ANSWER_FLOOR = 0.08   # 이 이상이면 명확히 관련 → 응답
+RERANKER_HARD_FLOOR = 0.02     # 이 미만이면 명백 무관 → 즉시 거부
+RERANKER_STANDOUT_RATIO = 3.0  # 중간대: 최상위가 나머지 중앙값의 이 배수 이상이면 '돌출'
+RERANKER_STANDOUT_GAP = 0.02   # 또는 나머지 중앙값과의 절대 격차가 이 이상이면 '돌출'
+RERANKER_REJECT_THRESHOLD = RERANKER_HARD_FLOOR  # 하위호환(옛 상수 참조 대비)
 
 # 임베딩 모델 (sentence-transformers 설치 시 사용, 미설치 시 TF-IDF 폴백)
 EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
