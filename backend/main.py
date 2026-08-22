@@ -78,6 +78,28 @@ class AskRequest(BaseModel):
     question: str
 
 
+import re as _re
+import unicodedata as _ud
+# 인젝션 방어 ③④ — 입력 정규화 + 출력 에코 필터
+_INVISIBLE = _re.compile("[​-‏‪-‮⁦-⁩﻿\x00-\x08\x0b\x0c\x0e-\x1f]")
+_INJECT_ECHO = _re.compile(
+    r"(이전|앞선|위의?)\s*지시.*?(무시|따르|무효)|프롬프트를?\s*(무시|공개|출력|알려)|"
+    r"ignore\s+(all\s+)?previous|system\s*prompt|시스템\s*프롬프트|개발자\s*모드|developer\s*mode",
+    _re.I)
+
+
+def _clean_query(q: str) -> str:
+    """③ 입력 정규화 — NFKC + 보이지 않는/제어 문자 제거 + 길이 제한."""
+    q = _ud.normalize("NFKC", q or "")
+    q = _INVISIBLE.sub("", q)
+    return q.strip()[:2000]
+
+
+def _strip_injection_echo(sentences: list) -> list:
+    """④ 출력 필터 — 시스템 지시/프롬프트를 되뇌는 문장 제거."""
+    return [s for s in sentences if not _INJECT_ECHO.search(s.get("text", ""))]
+
+
 @app.get("/")
 def index():
     return FileResponse(ROOT / "frontend" / "index.html")
@@ -86,7 +108,8 @@ def index():
 @app.post("/api/ask")
 def ask(req: AskRequest):
     r = get_retriever()
-    evidence = r.search(req.question, k=TOP_K, exclude=_disabled)
+    q = _clean_query(req.question)
+    evidence = r.search(q, k=TOP_K, exclude=_disabled)
 
     # 답변 거부: 하이브리드 검색 신호(리랭커 또는 dense+BM25)로 근거 유무 판단
     if r.is_refused(evidence):
@@ -95,7 +118,8 @@ def ask(req: AskRequest):
                           "다른 질문을 해보시거나 전문가와 상담하세요.",
                 "evidence": [], "verification": []}
 
-    gen = generate(req.question, evidence, backend=r.backend)
+    gen = generate(q, evidence, backend=r.backend)
+    gen["sentences"] = _strip_injection_echo(gen["sentences"])
 
     # LLM이 '근거로 답할 수 없음'으로 판단(빈 문장 또는 상담권고만)하면 거부로 처리한다.
     # 리랭커만으로는 인접 주제(다이어트·성인질환 등)와 실제 질문을 못 가르므로,
@@ -176,15 +200,16 @@ def ask_stream(req: AskRequest):
     총 처리 시간은 같지만, 빈 화면 대기 대신 글자가 흐르기 시작해 체감이 크게 빨라진다.
     """
     r = get_retriever()
+    q = _clean_query(req.question)   # ③ 입력 정규화(인젝션 방어)
 
     def gen():
-        evidence = r.search(req.question, k=TOP_K, exclude=_disabled)
+        evidence = r.search(q, k=TOP_K, exclude=_disabled)
         if r.is_refused(evidence):
             yield _sse("refused", {"answer": _REFUSE_SEARCH})
             return
         yield _sse("status", {"stage": "answer"})
         final = None
-        for ev in generate_stream(req.question, evidence, backend=r.backend):
+        for ev in generate_stream(q, evidence, backend=r.backend):
             if "delta" in ev:
                 yield _sse("delta", {"text": ev["delta"]})
             elif ev.get("refused"):
@@ -193,6 +218,10 @@ def ask_stream(req: AskRequest):
             elif "final" in ev:
                 final = ev["final"]
         if not final:
+            yield _sse("refused", {"answer": _REFUSE_LLM})
+            return
+        final["sentences"] = _strip_injection_echo(final["sentences"])  # ④ 출력 필터
+        if not any(s.get("citations") for s in final["sentences"]):
             yield _sse("refused", {"answer": _REFUSE_LLM})
             return
         verification = verify(final["sentences"], evidence, backend=r.backend)
